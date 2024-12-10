@@ -21,6 +21,7 @@ from pyscf import lib, dft
 from pyscf.lib import logger
 from pyscf.dft.gen_grid import Grids
 from pyscf.dft.numint import _NumInt, NumInt
+from pyscf import mcpdft
 from pyscf.mcpdft import pdft_veff, tfnal_derivs, _libxc, _dms, pdft_feff, pdft_eff
 from pyscf.mcpdft.otpd import get_ontop_pair_density
 from pyscf import __config__
@@ -31,7 +32,43 @@ FT_A = getattr(__config__, 'mcpdft_otfnal_ftransfnal_A', -475.60656009)
 FT_B = getattr(__config__, 'mcpdft_otfnal_ftransfnal_B', -379.47331922)
 FT_C = getattr(__config__, 'mcpdft_otfnal_ftransfnal_C', -85.38149682)
 
-OT_HYB_ALIAS = {'PBE0' : '0.25*HF + 0.75*PBE, 0.25*HF + 0.75*PBE'}
+REGISTERD_FUNC=[]
+
+def _register_MC23():
+    '''
+    This function is a wrapper to register the MC23 functional in libxc
+    '''
+    from pyscf import dft2
+    dft.libxc = dft2.libxc
+    dft.numint.libxc = dft2.libxc
+    dft.numint.LibXCMixin.libxc = dft2.libxc
+
+    # Reparametrized-M06L: rep-M06L
+    # MC23 = { '0.2952*HF + (1-0.2952)*rep-M06L, 0.2952*HF + (1-0.2952)*rep-M06L'}}
+        
+    # M06L_C has 27 parameters
+
+    MC23_C =  np.array([0.06,0.0031,0.00515088, 0.00304966, 2.427648e+00, 3.707473e+00, -7.943377e+00, -2.521466e+00, 
+     2.658691e+00, 2.932276e+00, -8.832841e-01, -1.895247e+00, -2.899644e+00, -5.068570e-01,
+       -2.712838e+00, 9.416102e-02, -3.485860e-03, -5.811240e-04, 6.668814e-04, 0.0, 2.669169e-01,
+      -7.563289e-02, 7.036292e-02, 3.493904e-04, 6.360837e-04, 0.0, 1e-10])
+
+    # M06L_X has 18 parameters
+    MC23_X =  np.array([3.352197e+00, 6.332929e-01, -9.469553e-01, 2.030835e-01,
+                         2.503819e+00, 8.085354e-01, -3.619144e+00, -5.572321e-01,
+                         -4.506606e+00, 9.614774e-01, 6.977048e+00, -1.309337e+00, -2.426371e+00,
+                           -7.896540e-03, 1.364510e-02, -1.714252e-06, -4.698672e-05, 0.0])
+    
+    # Source: https://github.com/ElectronicStructureLibrary/libxc
+    XC_ID_MGGA_C_M06_L = 233
+    XC_ID_MGGA_X_M06_L = 203
+    libxc_register_code = 'repM06L'.lower ()
+    dft2.libxc.register_custom_functional_(libxc_register_code, 'M06L', 
+                                           ext_params={XC_ID_MGGA_C_M06_L: MC23_C,
+                                                       XC_ID_MGGA_X_M06_L: MC23_X},
+                                                       hyb=(1.0,0,0))
+    
+OT_HYB_ALIAS = {'PBE0' : '0.25*HF + 0.75*PBE, 0.25*HF + 0.75*PBE',}
 
 def energy_ot (ot, casdm1s, casdm2, mo_coeff, ncore, max_memory=2000, hermi=1):
     '''Compute the on-top energy - the last term in
@@ -121,7 +158,7 @@ class otfnal:
         self.mol = mol
         self.verbose = mol.verbose
         self.stdout = mol.stdout
-
+       
     Pi_deriv = 0
 
     def _init_info (self):
@@ -734,7 +771,6 @@ _CS_b_DEFAULT = 0.132
 _CS_c_DEFAULT = 0.2533
 _CS_d_DEFAULT = 0.349
 
-
 def get_transfnal (mol, otxc):
     if otxc.upper ().startswith ('T'):
         xc_base = otxc[1:]
@@ -745,22 +781,33 @@ def get_transfnal (mol, otxc):
     else:
         raise NotImplementedError (
             'On-top pair-density functional names other than "translated" (t) or '
-            '"fully-translated (ft).'
-        )
+            '"fully-translated (ft).')
+    
     xc_base = OT_HYB_ALIAS.get (xc_base.upper (), xc_base)
-    if ',' not in xc_base and _libxc.is_hybrid_or_rsh (xc_base):
+    
+    if xc_base.upper()=='REPM06L' and xc_base not in REGISTERD_FUNC:
+        _register_MC23()
+        REGISTERD_FUNC.append('REPM06L')
+
+    elif (',' not in xc_base and _libxc.is_hybrid_or_rsh (xc_base)):
         raise NotImplementedError (
             'Aliased or built-in translated hybrid or range-separated '
             'functionals\nother than those listed in otfnal.OT_HYB_ALIAS. '
             'Build a compound functional\nstring with a comma separating the '
             'exchange and correlation parts, or use\notfnal.make_hybrid_fnal '
-            'instead.'
-        )
-    ks = dft.RKS (mol)
-    ks.xc = xc_base
-    return fnal_class (ks)
+            'instead.')
 
-
+    if xc_base.upper() in REGISTERD_FUNC:
+        ks = dft.RKS (mol)
+        ks.xc = xc_base.lower()
+        otclass = fnal_class (ks)
+        #otclass._numint.hybrid_coeff = lambda * args : (0.2952,0.2952)
+        return otclass
+    
+    else:
+        ks = dft.RKS (mol)
+        ks.xc = xc_base
+        return fnal_class (ks)
 
 class colle_salvetti_corr (otfnal):
 
