@@ -18,16 +18,18 @@ mol = gto.M(
     symmetry = 0
     )
 
+mol.verbose=4
 mf = scf.RHF(mol)
 mf.kernel()
 
 mc = mcpdft.CASSCF(mf, 'tpbe', 2, 2)
 mc.fix_spin_(ss=0) # often necessary!
-mc_sa = mc.state_average ([.5, .5]).run ()
+#mc_sa = mc.state_average ([.5, .5]).run ()
 # Note, this operates in the same way as "CMS-PDFT" but constructs and
 # diagonalizes a different matrix.
 mc_ms = mc.multi_state ([.5, .5], "lin").run (verbose=4)
 
+exit()
 print ('{:>21s} {:>12s} {:>12s}'.format ('state 0','state 1', 'gap'))
 fmt_str = '{:>9s} {:12.9f} {:12.9f} {:12.9f}'
 print (fmt_str.format ('CASSCF', mc_sa.e_mcscf[0], mc_sa.e_mcscf[1],
