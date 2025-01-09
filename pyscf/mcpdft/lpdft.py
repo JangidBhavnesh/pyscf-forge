@@ -655,6 +655,82 @@ class _LPDFTMix(_LPDFT):
         raise NotImplementedError("MultiState Mix LPDFT nuclear gradients")
 
 
+class _LPDFTDMRG(_LPDFT):
+    '''
+    Linearized PDFT with DMRG Solver.
+    '''
+
+    def make_lpdft_ham_for_dmrg_(mc, mo_coeff=None, ci=None, ot=None):
+        
+        if mo_coeff is None:
+            mo_coeff = mc.mo_coeff
+        if ci is None:
+            ci = mc.ci
+        if ot is None:
+            ot = mc.otfnal
+
+        ot.reset(mol=mc.mol)
+
+        spin = abs(mc.nelecas[0] - mc.nelecas[1])
+        omega, _, hyb = ot._numint.rsh_and_hybrid_coeff(ot.otxc, spin=spin)
+        if abs(omega) > 1e-11:
+            raise NotImplementedError("range-separated on-top functionals")
+        if abs(hyb[0] - hyb[1]) > 1e-11:
+            raise NotImplementedError(
+                "hybrid functionals with different exchange, correlations components"
+            )
+
+        cas_hyb = hyb[0]
+
+        ncas = mc.ncas
+        casdm1s_0, casdm2_0 = mc.get_casdm12_0(ci=ci)
+
+        mc.veff1, mc.veff2, E_ot = mc.get_pdft_veff(
+            mo=mo_coeff,
+            casdm1s=casdm1s_0,
+            casdm2=casdm2_0,
+            drop_mcwfn=True,
+            incl_energy=True,
+        )
+
+        # This is all standard procedure for generating the hamiltonian in PySCF
+        h1, h0 = mc.get_h1lpdft(E_ot, casdm1s_0, casdm2_0, hyb=1.0 - cas_hyb)
+        h2 = mc.get_h2lpdft()
+
+        def construct_ham_slice(solver, slice, nelecas):
+            ci_irrep = ci[slice]
+            if hasattr(solver, "orbsym"):
+                solver.orbsym = mc.fcisolver.orbsym
+            
+            nroots = len(ci_irrep) 
+            lpdft_irrep = np.zeros((nroots, nroots), dtype=h1.dtype)
+
+            for root_i in range(nroots):
+                for root_j in range(root_i+1):
+                    tdm1, tdm2 = solver.make_trans_rdm12(ci_irrep[root_i], \
+                                                         ci_irrep[root_j], ncas, nelecas)
+                    lpdft_irrep[root_i, root_j] = (np.tensordot(h1, tdm1, axes=((0, 1), (0, 1))) + \
+                                                   0.5*np.tensordot(h2, tdm2, axes=((0, 1), (0, 1))))
+
+            lpdft_irrep = lpdft_irrep + lpdft_irrep.T - np.diag(np.diag(lpdft_irrep))
+            diag_idx = np.diag_indices_from(lpdft_irrep)
+            lpdft_irrep[diag_idx] += h0 + cas_hyb * mc.e_mcscf[slice]
+            return lpdft_irrep
+
+        if not isinstance(mc, _LPDFTMix):
+            return construct_ham_slice(direct_spin1, slice(0, len(ci)), mc.nelecas)
+
+        # We have a StateAverageMix Solver
+        mc._irrep_slices = []
+        start = 0
+        for solver in mc.fcisolver.fcisolvers:
+            end = start + solver.nroots
+            mc._irrep_slices.append(slice(start, end))
+            start = end
+
+        return [construct_ham_slice(s, irrep, mc.fcisolver._get_nelec(s, mc.nelecas))
+            for s, irrep in zip(mc.fcisolver.fcisolvers, mc._irrep_slices)]
+
 def linear_multi_state(mc, weights=(0.5, 0.5), **kwargs):
     """Build linearized multi-state MC-PDFT method object
 
@@ -689,7 +765,6 @@ def linear_multi_state(mc, weights=(0.5, 0.5), **kwargs):
 
     LPDFT.__name__ = "LIN" + base_name
     return LPDFT(mc)
-
 
 def linear_multi_state_mix(mc, fcisolvers, weights=(0.5, 0.5), **kwargs):
     """Build SA Mix linearized multi-state MC-PDFT method object
