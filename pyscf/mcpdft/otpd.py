@@ -15,6 +15,7 @@
 #
 
 import numpy as np
+from pyscf import lib
 from pyscf.lib import logger
 from pyscf.dft.numint import _dot_ao_dm
 
@@ -113,7 +114,17 @@ def get_ontop_pair_density (ot, rho, ao, cascm2, mo_cas, deriv=0,
         dtype=grid2amo.dtype)
     gridkern[0] = grid2amo[0,:,:,np.newaxis] * grid2amo[0,:,np.newaxis,:]
     # r_0ai,  r_0aj  -> r_0aij
-    wrk0 = np.tensordot (gridkern[0], cascm2, axes=2)
+    # Previous
+    # wrk0 = np.tensordot (gridkern[0], cascm2, axes=2)
+    # New
+    ncas = cascm2.shape[0]
+    ngrids = grid2amo[0].shape[0]
+    cascm2 = cascm2.reshape((-1, ncas, ncas))
+    cascm2 += cascm2.transpose (0,2,1)
+    diag_idx = np.cumsum(np.arange(1, ncas + 1)) - 1
+    cascm2 = lib.pack_tril(cascm2)
+    cascm2[:,diag_idx] *= 0.5
+    wrk0 = np.tensordot (lib.pack_tril(gridkern[0]), cascm2.T, axes=1).reshape(ngrids, ncas, ncas)
     # r_0aij, P_ijkl -> P_0akl
     Pi[0] += (gridkern[0] * wrk0).sum ((1,2)) / 2
     # r_0aij, P_0aij -> P_0a
@@ -141,7 +152,10 @@ def get_ontop_pair_density (ot, rho, ao, cascm2, mo_cas, deriv=0,
         gridkern[4] += (grid2amo[1:4,:,:,np.newaxis]
             * grid2amo[1:4,:,np.newaxis,:]).sum (0)
         # r_1ai, r_1aj -> r_2aij
-        wrk1 = np.tensordot (gridkern[1:4], cascm2, axes=2)
+        # Previous
+        # wrk1 = np.tensordot (gridkern[1:4], cascm2, axes=2)
+        # New
+        wrk1 = np.tensordot (lib.pack_tril(gridkern[1:4]), cascm2.T, axes=1).reshape(ngrids, ncas, ncas)
         # r_1aij, P_ijkl -> P_1akl
         Pi[4] += (gridkern[4] * wrk0).sum ((1,2)) / 2
         # r_2aij, P_0aij -> P_2a
