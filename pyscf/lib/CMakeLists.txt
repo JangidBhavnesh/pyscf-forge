@@ -131,3 +131,23 @@ set_target_properties (clib_libxc_itrf2 PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}
     OUTPUT_NAME "xc_itrf2")
 
+# Build the DSRG library
+set (DSRG_SOURCE_FILES "../dsrg_mrpt2/dsrg_helper.c")
+add_library (clib_dsrg SHARED ${DSRG_SOURCE_FILES})
+set_target_properties (clib_dsrg PROPERTIES
+    CLEAN_DIRECT_OUTPUT 1
+    LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_NAME "dsrg")
+
+# Build the CSFstring shared library
+set (CSF_SOURCE_FILES "csf/csfstring.c")
+add_library (clib_csf SHARED ${CSF_SOURCE_FILES})
+target_link_libraries (clib_csf ${OPENMP_C_PROPERTIES})
+set_target_properties (clib_csf PROPERTIES
+    LINKER_LANGUAGE C
+    CLEAN_DIRECT_OUTPUT 1
+    LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_NAME "csf")
+
+add_subdirectory(sfnoci)
+
