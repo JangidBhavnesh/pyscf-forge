@@ -667,7 +667,6 @@ class _LPDFTDMRG(_LPDFT):
     '''
 
     def make_lpdft_ham_for_dmrg_(mc, mo_coeff=None, ci=None, ot=None):
-        
         if mo_coeff is None:
             mo_coeff = mc.mo_coeff
         if ci is None:
@@ -707,8 +706,8 @@ class _LPDFTDMRG(_LPDFT):
             ci_irrep = ci[slice]
             if hasattr(solver, "orbsym"):
                 solver.orbsym = mc.fcisolver.orbsym
-            
-            nroots = len(ci_irrep) 
+
+            nroots = len(ci_irrep)
             lpdft_irrep = np.zeros((nroots, nroots), dtype=h1.dtype)
 
             for root_i in range(nroots):
