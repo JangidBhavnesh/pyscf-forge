@@ -713,9 +713,9 @@ class _LPDFTDMRG(_LPDFT):
 
             for root_i in range(nroots):
                 for root_j in range(root_i+1):
-                    tdm1, tdm2 = solver.make_trans_rdm12(ci_irrep[root_i], \
+                    tdm1, tdm2 = solver.make_trans_rdm12(ci_irrep[root_i],
                                                          ci_irrep[root_j], ncas, nelecas)
-                    lpdft_irrep[root_i, root_j] = (np.tensordot(h1, tdm1, axes=((0, 1), (0, 1))) + \
+                    lpdft_irrep[root_i, root_j] = (np.tensordot(h1, tdm1, axes=((0, 1), (0, 1))) +
                                                    0.5*np.tensordot(h2, tdm2, axes=((0, 1), (0, 1))))
 
             lpdft_irrep = lpdft_irrep + lpdft_irrep.T - np.diag(np.diag(lpdft_irrep))
