@@ -123,13 +123,17 @@ def get_ontop_pair_density (ot, rho, ao, cascm2, mo_cas, deriv=0,
     # wrk0 = np.tensordot (gridkern[0], cascm2, axes=2)
     # New
     ncas = cascm2.shape[0]
-    ngrids = grid2amo[0].shape[0]
     cascm2sym = cascm2.copy().reshape((-1, ncas, ncas))
     cascm2sym += cascm2sym.transpose (0,2,1)
     diag_idx = np.cumsum(np.arange(1, ncas + 1)) - 1
     cascm2sym = lib.pack_tril(cascm2sym)
     cascm2sym[:,diag_idx] *= 0.5
-    wrk0 = np.tensordot (lib.pack_tril(gridkern[0]), cascm2sym.T, axes=1).reshape(ngrids, ncas, ncas)
+    cascm2sym = cascm2sym.T
+    cascm2sym = cascm2sym.reshape(-1, ncas, ncas)
+    cascm2sym = lib.pack_tril(cascm2sym)
+    wrk0 = np.tensordot (lib.pack_tril(gridkern[0]), cascm2sym, axes=1)
+    wrk0 = lib.unpack_tril(wrk0, filltriu=1, axis=-1, out=None)
+
     # r_0aij, P_ijkl -> P_0akl
     Pi[0] += (gridkern[0] * wrk0).sum ((1,2)) / 2
     # r_0aij, P_0aij -> P_0a
@@ -160,7 +164,8 @@ def get_ontop_pair_density (ot, rho, ao, cascm2, mo_cas, deriv=0,
         # Previous
         # wrk1 = np.tensordot (gridkern[1:4], cascm2, axes=2)
         # New
-        wrk1 = np.tensordot (lib.pack_tril(gridkern[1:4]), cascm2sym.T, axes=1).reshape(ngrids, ncas, ncas)
+        wrk1 = np.tensordot (lib.pack_tril(gridkern[1:4]), cascm2sym, axes=1)
+        wrk1 = lib.unpack_tril(wrk1, filltriu=1, axis=-1, out=None)
         # r_1aij, P_ijkl -> P_1akl
         Pi[4] += (gridkern[4] * wrk0).sum ((1,2)) / 2
         # r_2aij, P_0aij -> P_2a
