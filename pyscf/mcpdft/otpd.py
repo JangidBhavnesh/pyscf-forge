@@ -161,11 +161,7 @@ def get_ontop_pair_density (ot, rho, ao, cascm2, mo_cas, deriv=0,
         gridkern[4] += (grid2amo[1:4,:,:,np.newaxis]
             * grid2amo[1:4,:,np.newaxis,:]).sum (0)
         # r_1ai, r_1aj -> r_2aij
-        # Previous
-        # wrk1 = np.tensordot (gridkern[1:4], cascm2, axes=2)
-        # New
-        wrk1 = np.tensordot (lib.pack_tril(gridkern[1:4]), cascm2sym, axes=1)
-        wrk1 = lib.unpack_tril(wrk1, filltriu=1, axis=-1, out=None)
+        wrk1 = np.tensordot (gridkern[1:4], cascm2, axes=2)
         # r_1aij, P_ijkl -> P_1akl
         Pi[4] += (gridkern[4] * wrk0).sum ((1,2)) / 2
         # r_2aij, P_0aij -> P_2a
