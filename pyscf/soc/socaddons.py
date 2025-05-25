@@ -18,4 +18,83 @@
 '''
 Helper Functions for SOC
 '''
+import numpy as np
+from pyscf import lib
+from pyscf.soc import amfi as amfIntegrals
+
+logger = lib.logger
+
+def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DK', dm=None):
+    '''
+    Wrapper for the SOC integral generation
+    1e and 2e integrals are generated using the amfi module.
+    In case of mmfi, the parent wavefunction density matrix is used.
+    args:
+        mol:
+            molecule object
+        somf: bool
+            spin-orbit mean field integrals.
+        amf: bool
+            atomic mean field integrals.
+            In this case, amf dm is generated.
+        mmf: bool
+            molecular mean field integrals.
+        soc1e: bool
+            include 1e SOC integrals.
+        soc2e: bool
+            include 2e SOC integrals.
+        ham: str
+            SOC Hamiltonian (BP or DK)
+        dm: np.array (nao, nao), optional
+            density matrix of parent wavefunction.
+    returns:
+        hso:
+            SOC integrals of dimension (3, nao, nao)
+    '''
+
+    # Sanity checks
+    assert ham in ('BP', 'DK'),\
+        "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
+
+    assert somf, "Explicit 2e SOC integrals are implemented yet."
+
+    if mol.has_ecp():
+        raise NotImplementedError("ECP is not supported yet.")
+
+    assert soc1e or soc2e, "Atleast one of the SOC integrals should be included."
+
+    if amf:
+        dm0 = amfIntegrals.compute_amfi_dm(mol)
+    elif mmf:
+        assert dm is not None, \
+            "For mmf, the density matrix of the parent wavefunction must be provided."
+        dm0 = dm
+
+    log = logger.Logger(mol.stdout, mol.verbose)
+    cpu0 = logger.process_clock(), logger.perf_counter()
+    hso1e, hso2e = amfIntegrals.compute_soc_integrals(mol, dm0, ham=ham)
+    log.timer("SOC integrals generation took: ", *cpu0)
+
+    if soc1e and soc2e:
+        hso = hso1e+hso2e
+    elif soc1e:
+        hso = hso1e
+    elif soc2e:
+        hso = hso2e
+    return np.array([x.T for x in hso])
+
+if __name__ == "__main__":
+    from pyscf import scf, gto
+    xyz ='''O  0.00000000   0.08111156   0.00000000
+            H  0.78620605   0.66349738   0.00000000
+            H -0.78620605   0.66349738   0.00000000'''
+    mol = gto.M(atom=xyz, basis='cc-pvdz-dk', verbose=5)
+    mf = scf.RHF(mol).run()
+    dm = mf.make_rdm1()
+
+    # AMFI Integrals
+    hso = socintegrals(mol, ham='DK')
+
+    # MMFI Integrals
+    hso_mmfi = socintegrals(mol, amf=False, mmf=True, ham='DK', dm=dm)
 
