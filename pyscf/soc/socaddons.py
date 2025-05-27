@@ -88,7 +88,7 @@ if __name__ == "__main__":
     xyz ='''O  0.00000000   0.08111156   0.00000000
             H  0.78620605   0.66349738   0.00000000
             H -0.78620605   0.66349738   0.00000000'''
-    mol = gto.M(atom=xyz, basis='cc-pvdz-dk', verbose=5)
+    mol = gto.M(atom=xyz, basis='cc-pvtz-dk', verbose=5)
     mf = scf.RHF(mol).run()
     dm = mf.make_rdm1()
 
@@ -96,5 +96,5 @@ if __name__ == "__main__":
     hso = socintegrals(mol, ham='DK')
 
     # MMFI Integrals
-    hso_mmfi = socintegrals(mol, amf=False, mmf=True, ham='DK', dm=dm)
+    # hso_mmfi = socintegrals(mol, amf=False, mmf=True, ham='DK', dm=dm)
 

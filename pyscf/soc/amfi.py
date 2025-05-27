@@ -20,6 +20,7 @@ SOC Integral Generation Based on Atomic Mean-field Approximation (AMFI)
 and One-Center Approximation for both 1e and 2e integrals.
 '''
 import copy
+import scipy
 import numpy as np
 from functools import reduce
 from pyscf import lib, ao2mo
@@ -82,7 +83,7 @@ def compute_amfi_dm(mol, atomic_configuration=elements.CONFIGURATION):
 
         atm_dms.append(dm)
 
-    dm = np.linalg.block_diag(*atm_dms)
+    dm = scipy.linalg.block_diag(*atm_dms)
 
     if mol.cart:
         cart2sph = mol.cart2sph_coeff(normalized='sp')
@@ -261,7 +262,7 @@ def compute_hso1(mol, ham='DK'):
         b0, b1, p0, p1 = aoslice[i]
         atoms._bas = mol._bas[b0:b1]
         pmol, ctr_coeff = atoms.decontract_basis()
-        contr_coeff = np.linalg.block_diag(*ctr_coeff)
+        contr_coeff = scipy.linalg.block_diag(*ctr_coeff)
         contr_coeff2 = compute_kinematic_factors(pmol,contr_coeff, ham=ham)[1]
         pmol.set_rinv_orig(mol.atom_coord(i))
         atom_1e = pmol.intor('int1e_prinvxp', comp=3)
@@ -303,6 +304,7 @@ def compute_hso2(mol, dm0, ham='DK'):
         b0, b1, p0, p1 = aoslice[ia]
         atom._bas = mol._bas[b0:b1]
         pmol, ctr_coeff = atom.decontract_basis()
+        ctr_coeff = scipy.linalg.block_diag(*ctr_coeff)
         contr_coeff1, contr_coeff2 = compute_kinematic_factors(pmol,ctr_coeff, ham=ham)
         vj1, vk1 = compute_soc2e_jk(pmol, dm0[p0:p1, p0:p1], contr_coeff1, contr_coeff2)
         vj[:, p0:p1, p0:p1] = vj1
@@ -329,10 +331,10 @@ def compute_soc_integrals(mol, dm, ham='DK'):
         hso: tuple ((3, nao, nao), (3, nao, nao))
             1e and 2e SOC integrals in cGTO basis
     '''
-    cpu0 = logger.process_clock(), logger.perf_counter()
-    log = logger.Logger(mol.stdout, mol.verbose)
+    cput0 = (logger.process_clock(), logger.perf_counter())
+    log = logger.new_logger(mol, mol.verbose)
     hso1e = compute_hso1(mol, ham=ham)
-    log.debug("1e SOC integrals generation took: %s", logger.timer(*cpu0))
+    log.timer("1e SOC integrals generation took:", *cput0)
     hso2e = compute_hso2(mol, dm, ham=ham)
-    log.debug("2e integrals generation took: %s", logger.timer(*cpu0))
+    log.timer("2e integrals generation took: ", *cput0)
     return 1j * 2. * hso1e, 1j * 2. * hso2e
