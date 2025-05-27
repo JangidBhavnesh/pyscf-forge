@@ -13,17 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Author: Bhavnesh Jangid <jangidbhavnesh@uchicago.edu>
 
-'''
-Quasi-Degenerate Perturbation Theory Based Spin-Orbit Coupling Treatment
-'''
+from pyscf.siso.socaddons import socintegrals, sacasscf_solver
+from pyscf.siso.siso import SISO
 
-import numpy as np
-from sympy import symbols
-from sympy.physics.quantum.cg import CG
-from itertools import product
-from functools import reduce
-from pyscf import scf, lib, fci
-from pyscf.soc import socaddons
+
 

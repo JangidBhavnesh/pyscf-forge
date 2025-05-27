@@ -18,9 +18,11 @@
 '''
 Helper Functions for SOC
 '''
+
 import numpy as np
-from pyscf import lib
-from pyscf.soc import amfi as amfIntegrals
+from pyscf import lib, mcscf
+from pyscf.csf_fci import csf_solver
+from pyscf.siso import amfi as amfIntegrals
 
 logger = lib.logger
 
@@ -82,6 +84,48 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
     elif soc2e:
         hso = hso2e
     return np.array([x.T for x in hso])
+
+def sacasscf_solver(mc, states, weights=None, ms=None):
+    '''
+    Wrapper for the generating the SACASSCF solver.
+    args:
+        mc: pyscf.mcscf.CASSCF object
+            CASSCF object to be used for SACASSCF.
+        states: list of tuples
+            Each tuple contains (nroots, spinmult, wfnsym).
+            nroots: int, number of roots for the state.
+            spinmult: int, spin multiplicity of the state.
+            wfnsym: int or None, symmetry of the wavefunction.
+        weights: np.array or None
+            Weights for each state. If None, equal weights are assigned.
+        ms: str or None
+            Method for mixing states. If 'lin', linear mixing is used.
+            Otherwise, state average mixing is used.
+    returns:
+        mc: state-averaged/mix CAS object
+    '''
+    mol = mc._scf.mol
+
+    if not isinstance(states, (list, tuple)):
+        raise TypeError("states must be a list of tuples (nroots, spinmult, wfnsym)")
+
+    states= sorted(states, key=lambda x: x[1])
+
+    states = [state if len(state) > 2
+              else state + (None,) * (3 - len(state))
+              for state in states]
+
+    solvers = [csf_solver(mol, smult=smult, spin=smult-1,
+                          wfnsym=wfnsym, nroots=nroots)
+                          for (nroots, smult, wfnsym) in states]
+
+    statetot = sum(state[0] for state in states)
+    weights = np.ones(statetot) / statetot if weights is None else weights
+
+    if ms == 'lin':
+        return mc.multi_state_mix(solvers, weights, "lin")
+    else:
+        return mcscf.state_average_mix_(mc, solvers, weights)
 
 if __name__ == "__main__":
     from pyscf import scf, gto
