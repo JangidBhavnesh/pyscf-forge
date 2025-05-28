@@ -564,21 +564,32 @@ class SISO(lib.StreamObject):
     def kernel(self):
         return kernel(self)
     
+    @staticmethod
+    def spin_contanimation_check(ss, spinconttol=1e-4, max_spin=15):
+        '''
+        Checking the spin-purity of the modeal state wave functions.
+        '''
+        assertmsg = 'Model states are not spin-pure. Crashing the calculation.'
+        sslookup = [s/2*(s/2+1) for s in range(max_spin)]
+        for s2 in ss:
+            assert any(abs(s2 - ssideal) <= spinconttol for ssideal in sslookup), assertmsg
+
     def _initialize(self):
+        '''
+        Initial SOC Free Model Space
+        '''
         mc = self.mc
-
         log = logger.Logger(mc.stdout, mc.verbose)
-
         nroots=len(self.mc.e_states)
         e_states = np.array(mc.e_states)
-        e_states = e_states[np.argsort(e_states)]
+        sortedindx = np.argsort(e_states)
+        e_states = e_states[sortedindx]
         ss = np.array(mc.fcisolver.states_spin_square(mc.ci, mc.ncas, mc.nelecas)[0])
-        ss = ss[np.argsort(e_states)]
+        ss = ss[sortedindx]
 
-        log.note(" ")
         log.info('******** %s ********', "Spin Orbit Free Energetics")
         for i in range(nroots):
-            log.note(" State %d Total Energy = %.12g  S2 = %.2g",
+            log.note(" State %d Total Energy = %.10f S^2 = %.2f",
                     i,
                     e_states[i],
                     ss[i])
@@ -592,8 +603,13 @@ class SISO(lib.StreamObject):
                 e_states[i] - e_states[0],
                 au2ev * (e_states[i] - e_states[0]),
                 au2cminv * (e_states[i] - e_states[0])))
-            
+
+        self.spin_contanimation_check(ss)
+
     def _finalize(self):
+        '''
+        Final SOC States
+        '''
         mc = self.mc
 
         log = logger.Logger(mc.stdout, mc.verbose)
@@ -601,7 +617,7 @@ class SISO(lib.StreamObject):
         log.note(" ")
         log.info('******** %s ********',"Spin Orbit Coupling Energetics")
         for i in range(nroots):
-            log.note(" SO-CASSI State %d Total Energy = %.12g ",
+            log.note(" SO-CASSI State %d Total Energy = %.10f ",
                     i,
                     self.si_energies[i])
 

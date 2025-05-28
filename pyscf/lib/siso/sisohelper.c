@@ -26,8 +26,8 @@ void SOCcompute_ss(const double complex* zeff,
     int b2b3shp = b2shp * b3shp;
 
     // Initializing the b_data
-    #pragma omp parallel for schedule(static)
-    for (int i = 0; i < bsize; ++i) {
+    #pragma omp parallel for
+    for (int i = 0; i < b0shp * b1shp * b2shp * b3shp; ++i) {
         b_data[i] = 0.0 + 0.0 * I;
     }
 
@@ -53,7 +53,7 @@ void SOCcompute_ss(const double complex* zeff,
                     }
 
                     // Store the result to b_data
-                    int b_idx = b0 * b1b2b3shp + b1 * b2b3shp + b2 * b3shp + b3;
+                    int b_idx = b0 * b1shp * b2shp * b3shp + b1 * b2shp * b3shp + b2 * b3shp + b3;
                     b_data[b_idx] = sum;
                 }
             }
