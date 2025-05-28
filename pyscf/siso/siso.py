@@ -79,7 +79,6 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
     # Basis transformation
     mo_cas = mc.mo_coeff[:, ncore:ncore+ncas]
     h1 = np.asarray([reduce(np.dot, (mo_cas.T, hso_, mo_cas)) for hso_ in hso])
-
     # Cartesian to Spherical tensor transformation
     zsoc = np.zeros((3, ncas, ncas), dtype=hso[0].dtype)
     zsoc[0] = 1./np.sqrt(2)  * (h1[0] - 1.j*h1[1])
@@ -544,7 +543,7 @@ class SISO(lib.StreamObject):
         log.note("1e soc: %s", self.soc1e)
         log.note("2e soc: %s", self.soc2e)
         log.note("ham: %s", self.ham)
-        log.note("speed of light: %.2f a.u.", lib.param.LIGHT_SPEED)
+        log.note("speed of light: %.8f a.u.", lib.param.LIGHT_SPEED)
         log.note(" ")
         self._initialize()
         return self
