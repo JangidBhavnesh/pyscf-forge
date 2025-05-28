@@ -112,7 +112,7 @@ def sacasscf_solver(mc, states, weights=None, ms=None):
         solver.nroots = nroots
         solver.spin = smult - 1
         return solver
-    
+
     if not isinstance(states, (list, tuple)):
         raise TypeError("states must be a list of tuples (nroots, spinmult, wfnsym)")
 

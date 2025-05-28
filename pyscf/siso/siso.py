@@ -47,7 +47,7 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
     Args:
         siso:
             instance of class SISO
-        somf: 
+        somf:
             spin-orbit mean field integrals.
         amf:
             atomic mean field integrals.
@@ -60,8 +60,8 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
         ham:
             SOC Hamiltonian (BP or DK)
     Returns:
-        zsoc: 
-            SOC integrals of dimension (3, ncas, ncas)    
+        zsoc:
+            SOC integrals of dimension (3, ncas, ncas)
     """
     mc = siso.mc
     mol = mc._scf.mol
@@ -71,11 +71,11 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
     dm = None
     if mmf:
         dm = mc.make_rdm1()
-    
+
     # Generate the SOC integrals
-    hso = socaddons.socintegrals(mol, somf=somf, amf=amf, mmf=mmf, 
+    hso = socaddons.socintegrals(mol, somf=somf, amf=amf, mmf=mmf,
                                  soc1e=soc1e, soc2e=soc2e, ham=ham, dm=dm)
-    
+
     # Basis transformation
     mo_cas = mc.mo_coeff[:, ncore:ncore+ncas]
     h1 = np.asarray([reduce(np.dot, (mo_cas.T, hso_, mo_cas)) for hso_ in hso])
@@ -89,51 +89,6 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
     del hso, h1
 
     return zsoc
-
-def assemble_amat(siso):
-    '''
-    Assemble the coupling coefficients for the model space.
-    Args:
-        siso:
-            instance of class SISO
-    Returns:
-        amat: list 
-    '''
-    
-    def _gen_linkstr_index(ms, ncasorb, alphae, betae):
-        ms_map = {-1:fci.cistring.gen_des_str_index,
-                 0:fci.cistring.gen_linkstr_index,
-                 1:fci.cistring.gen_cre_str_index}
-        return [ms_map.get(ms[0])(ncasorb, alphae), 
-                ms_map.get(ms[1])(ncasorb, betae)]
-    
-    def _get_alpha_beta(nelec, S):
-        alphae = (nelec + S) // 2
-        betae = nelec - alphae
-        return alphae, betae
-    
-    stuples = siso.stuples
-    mc = siso.mc
-    ncasorb = list(range(mc.ncas))
-    nelec = sum(mc.nelecas)
-
-    amat = []
-    for (s1, s2) in stuples:
-        if s1 == s2:  # SS part
-            nelec_a, nelec_b = _get_alpha_beta(nelec, s1)
-            amat.append(_gen_linkstr_index((0,0), ncasorb, nelec_a, nelec_b))
-        elif s1 + 2 == s2:  # SS+1 part
-            nelec_a, nelec_b = _get_alpha_beta(nelec, s1+2)
-            amat.append(_gen_linkstr_index((-1,1), ncasorb, nelec_a, nelec_b))
-        elif s1 == s2 + 2: # SS-1 part
-            nelec_a, nelec_b = _get_alpha_beta(nelec, s1-2)
-            amat.append(_gen_linkstr_index((1,-1), ncasorb, nelec_a, nelec_b))
-        else: # No connection
-            amat.append(0)
-
-    imds = siso.imds
-    imds.a = amat
-    return amat
 
 def assemble_civecs(siso):
     '''
@@ -162,7 +117,7 @@ def assemble_civecs(siso):
 
     imds = siso.imds
     imds.c = cimat
-    
+
     return cimat
 
 def assemble_energy(siso):
@@ -189,6 +144,50 @@ def assemble_energy(siso):
 
     return e
 
+def assemble_amat(siso):
+    '''
+    Assemble the coupling coefficients for the model space.
+    Args:
+        siso:
+            instance of class SISO
+    Returns:
+        amat: list
+    '''
+    def _gen_linkstr_index(ms, ncasorb, alphae, betae):
+        ms_map = {-1:fci.cistring.gen_des_str_index,
+                 0:fci.cistring.gen_linkstr_index,
+                 1:fci.cistring.gen_cre_str_index}
+        return [ms_map.get(ms[0])(ncasorb, alphae),
+                ms_map.get(ms[1])(ncasorb, betae)]
+
+    def _get_alpha_beta(nelec, S):
+        alphae = (nelec + S) // 2
+        betae = nelec - alphae
+        return alphae, betae
+
+    stuples = siso.stuples
+    mc = siso.mc
+    ncasorb = list(range(mc.ncas))
+    nelec = sum(mc.nelecas)
+
+    amat = []
+    for (s1, s2) in stuples:
+        if s1 == s2:  # SS part
+            nelec_a, nelec_b = _get_alpha_beta(nelec, s1)
+            amat.append(_gen_linkstr_index((0,0), ncasorb, nelec_a, nelec_b))
+        elif s1 + 2 == s2:  # SS+1 part
+            nelec_a, nelec_b = _get_alpha_beta(nelec, s1+2)
+            amat.append(_gen_linkstr_index((-1,1), ncasorb, nelec_a, nelec_b))
+        elif s1 == s2 + 2: # SS-1 part
+            nelec_a, nelec_b = _get_alpha_beta(nelec, s1-2)
+            amat.append(_gen_linkstr_index((1,-1), ncasorb, nelec_a, nelec_b))
+        else: # No connection
+            amat.append(0)
+
+    imds = siso.imds
+    imds.a = amat
+    return amat
+
 def compute_cg_coefficients(S, Ms=0):
     """
     Compute the Clebsch-Gordan coefficients for the spin-orbit coupling.
@@ -201,9 +200,9 @@ def compute_cg_coefficients(S, Ms=0):
             a list of Clebsch-Gordan coefficients for each state
     """
     assert Ms in (0, 1, -1), "Ms should be either 0, 1 or -1."
-    
+
     Ms_map = {0:S+1, 1:S+3, -1:S-1}
-    
+
     ss = symbols('S')
     sbra = S + 1
     sket = Ms_map[Ms]
@@ -215,9 +214,8 @@ def compute_cg_coefficients(S, Ms=0):
             phase = (-1) ** (g0 + S / 2 - (g1 - S / 2))
             for g2 in range(sket):
                 g[g0, g1, g2] += phase * cg.Wigner3j(ss/2, -(g1 - ss/2),
-                                                     1, 1 - g0, 
-                                                     ss/2 + Ms, g2 - ss/2 - Ms
-                                                    ).subs(ss,S).doit()
+                                                     1, 1 - g0,
+                                                     ss/2 + Ms, g2 - ss/2 - Ms).subs(ss,S).doit()
     return g
 
 def compute_dmat(siso):
@@ -241,13 +239,13 @@ def compute_dmat(siso):
             civecbra = civecket
             alphamat, betamat = imds.a[i] # coupling coefficients
             b = np.zeros((3, *civecket.shape), dtype='complex')
-    
+
             # Instead of passing all of these shapes, I am passing a single shape array
-            shapearray = np.array([*b.shape, 
-                                   alphamat.shape[1], 
-                                   betamat.shape[1], 
-                                   zmat.shape[1], 
-                                   civecket.shape[1], 
+            shapearray = np.array([*b.shape,
+                                   alphamat.shape[1],
+                                   betamat.shape[1],
+                                   zmat.shape[1],
+                                   civecket.shape[1],
                                    civecket.shape[2]],
                                    dtype=np.int32, order='C')
 
@@ -261,27 +259,26 @@ def compute_dmat(siso):
                 ctypes.POINTER(ctypes.c_int),     # betadet
                 ctypes.POINTER(ctypes.c_int)      # shapearray
             ]
-        
+
             libsiso.SOCcompute_ss(
                 flatten_to_ptr(zmat, ctypes.c_double),
                 flatten_to_ptr(civecket, ctypes.c_double),
                 b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
-                flatten_to_ptr(shapearray, ctypes.c_int)
-                )
-        
+                flatten_to_ptr(shapearray, ctypes.c_int))
+
             b = b.reshape(3, *civecket.shape)
-            
+
             # WE TDM
             w = np.einsum('kij, mnij->mnk', civecbra, b)
 
             # Multiply by the Clebsch-Gordan coefficients
             g = compute_cg_coefficients(S, Ms=0)
             d = np.einsum('mij, mkl->kilj', g, w)
-           
+
             d_col.append(d)
-        
+
         elif s1 + 2 == s2:  # SS+1 part
             S = s1
             iS = np.where(twoslst == S)[0][0]
@@ -291,17 +288,16 @@ def compute_dmat(siso):
             civecbra = imds.c[iSp].astype(np.complex128)
             alphamat, betamat = imds.a[i] # coupling coefficients
             b = np.zeros((3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
-            
 
             # Instead of passing all of these shapes, I am passing a single shape array
-            shapearray = np.array([*b.shape, 
-                                   alphamat.shape[1], 
-                                   betamat.shape[1], 
-                                   zmat.shape[1], 
-                                   civecket.shape[1], 
+            shapearray = np.array([*b.shape,
+                                   alphamat.shape[1],
+                                   betamat.shape[1],
+                                   zmat.shape[1],
+                                   civecket.shape[1],
                                    civecket.shape[2]],
                                    dtype=np.int32, order='C')
-            
+
             b = np.ascontiguousarray(b.flatten())
 
             libsiso.SOCcompute_ssp.argtypes = [
@@ -319,11 +315,10 @@ def compute_dmat(siso):
                 b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
-                flatten_to_ptr(shapearray, ctypes.c_int)
-                )
-            
+                flatten_to_ptr(shapearray, ctypes.c_int))
+
             b = b.reshape(3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2])
-            
+
             # WE TDM
             w = np.einsum('kij, mnij->mnk', civecbra, b)
 
@@ -331,7 +326,7 @@ def compute_dmat(siso):
             g = compute_cg_coefficients(S, Ms=1)
             d = np.einsum('mij, mkl->kilj', g, w)
             d_col.append(d)
-        
+
         elif s1 == s2 + 2: # SS-1 part
             S = s1
             iS = np.where(twoslst == S)[0][0]
@@ -344,14 +339,14 @@ def compute_dmat(siso):
             b = np.zeros((3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
 
             # Instead of passing all of these shapes, I am passing a single shape array
-            shapearray = np.array([*b.shape, 
-                                   alphamat.shape[1], 
-                                   betamat.shape[1], 
-                                   zmat.shape[1], 
-                                   civecket.shape[1], 
+            shapearray = np.array([*b.shape,
+                                   alphamat.shape[1],
+                                   betamat.shape[1],
+                                   zmat.shape[1],
+                                   civecket.shape[1],
                                    civecket.shape[2]],
                                    dtype=np.int32, order='C')
-            
+
             b = np.ascontiguousarray(b.flatten())
 
             libsiso.SOCcompute_ssm.argtypes = [
@@ -368,9 +363,8 @@ def compute_dmat(siso):
                 b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
-                flatten_to_ptr(shapearray, ctypes.c_int)
-                )
-            
+                flatten_to_ptr(shapearray, ctypes.c_int))
+
             b = b.reshape(3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2])
 
             # WE TDM
@@ -419,27 +413,27 @@ def compute_hamiltonian(siso):
                     coeff = np.sqrt((S / 2 + 1) * (S + 1) / (S / 2)) / 2
                 else:
                     coeff = 0.0
-                
+
                 h = coeff * d[indt].reshape(nstates, nstates, order='C')
 
                 for ns in range(nstates):
                     n1 = divmod(ns, S+1)[0]
                     h[ns, ns] += e[i][n1]
-            
+
             elif s1 + 2 == s2:
                 S = s1
                 nstatesa = counter[S]
                 nstatesb = counter[S + 2]
                 coeff = np.sqrt((S + 3) / 2)
                 h = coeff * d[indt].reshape((nstatesa, nstatesb), order='C')
-               
+
             elif s1 == s2 + 2:  # SS-1 part
                 S = s1
                 nstatesa = counter[S]
                 nstatesb = counter[S - 2]
                 coeff = -np.sqrt((S + 1) / 2)
                 h = coeff * d[indt].reshape((nstatesa, nstatesb), order='C')
-            
+
             else:  # No connection
                 nstatesa = counter[s1]
                 nstatesb = counter[s2]
@@ -456,7 +450,7 @@ def build_imds(siso):
     soc1e = siso.soc1e
     soc2e = siso.soc2e
     ham = siso.ham
-    
+
     imds.z = calculate_zmat(siso, somf=somf, amf=amf, mmf=mmf,
                             soc1e=soc1e, soc2e=soc2e, ham=ham)
     imds.a = assemble_amat(siso)
@@ -500,7 +494,7 @@ class _IMDS:
 
 class SISO(lib.StreamObject):
     """
-    Quasi-Degenerate Perturbation Theory Based Spin-Orbit Coupling Treatment.: 
+    Quasi-Degenerate Perturbation Theory Based Spin-Orbit Coupling Treatment.:
     State interaction Spin-Orbit Coupling (SISO) class.
     """
     _keys=['statelst', 'twoslst', 'stuples','si_energies', 'si_vecs']
@@ -539,7 +533,7 @@ class SISO(lib.StreamObject):
             raise NotImplementedError("ECP is not supported yet.")
         assert self.soc1e or self.soc2e, "At least one of the SOC integrals should be included."
         return self
-    
+
     def dump_flags(self):
         log = logger.Logger(self.mc.stdout, self.mc.verbose)
         log.note(" ")
@@ -554,7 +548,7 @@ class SISO(lib.StreamObject):
         log.note(" ")
         self._initialize()
         return self
-    
+
     def build_imds(self):
         return build_imds(self)
 
@@ -563,7 +557,7 @@ class SISO(lib.StreamObject):
 
     def kernel(self):
         return kernel(self)
-    
+
     @staticmethod
     def spin_contanimation_check(ss, spinconttol=1e-4, max_spin=15):
         '''
@@ -630,5 +624,5 @@ class SISO(lib.StreamObject):
                 self.si_energies[i] - self.si_energies[0],
                 au2ev * (self.si_energies[i] - self.si_energies[0]),
                 au2cminv * (self.si_energies[i] - self.si_energies[0])))
-       
+
 
