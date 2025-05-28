@@ -106,6 +106,13 @@ def sacasscf_solver(mc, states, weights=None, ms=None):
     '''
     mol = mc._scf.mol
 
+    def _construct_solver(mol, smult, wfnsym, nroots):
+        solver = csf_solver(mol, smult=smult)
+        solver.wfnsym = wfnsym
+        solver.nroots = nroots
+        solver.spin = smult - 1
+        return solver
+    
     if not isinstance(states, (list, tuple)):
         raise TypeError("states must be a list of tuples (nroots, spinmult, wfnsym)")
 
@@ -115,8 +122,7 @@ def sacasscf_solver(mc, states, weights=None, ms=None):
               else state + (None,) * (3 - len(state))
               for state in states]
 
-    solvers = [csf_solver(mol, smult=smult, spin=smult-1,
-                          wfnsym=wfnsym, nroots=nroots)
+    solvers = [_construct_solver(mol, smult, wfnsym, nroots)
                           for (nroots, smult, wfnsym) in states]
 
     statetot = sum(state[0] for state in states)

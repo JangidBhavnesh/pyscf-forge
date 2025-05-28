@@ -21,7 +21,7 @@ Quasi-Degenerate Perturbation Theory Based Spin-Orbit Coupling Treatment
 
 import numpy as np
 from sympy import symbols
-from sympy.physics.quantum.cg import CG
+from sympy.physics.quantum import cg
 from itertools import product
 from functools import reduce
 from pyscf import scf, lib, fci
@@ -92,45 +92,42 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
 
 def assemble_amat(siso):
     '''
-    Computing the intermediate a tensor
-
+    Assemble the coupling coefficients for the model space.
     Args:
         siso:
             instance of class SISO
-
     Returns:
-        amat:
-            a list of nSt elements each of dimernsions 2 x ncia||b x 4  
+        amat: list 
     '''
     
     def _gen_linkstr_index(ms, ncasorb, alphae, betae):
         ms_map = {-1:fci.cistring.gen_des_str_index,
                  0:fci.cistring.gen_linkstr_index,
                  1:fci.cistring.gen_cre_str_index}
-        return [ms_map[ms[0]](ncasorb, alphae), 
-                ms_map[ms[1]](ncasorb, betae)]
+        return [ms_map.get(ms[0])(ncasorb, alphae), 
+                ms_map.get(ms[1])(ncasorb, betae)]
     
     def _get_alpha_beta(nelec, S):
         alphae = (nelec + S) // 2
         betae = nelec - alphae
         return alphae, betae
     
-    Stuples = siso.stuples
+    stuples = siso.stuples
     mc = siso.mc
     ncasorb = list(range(mc.ncas))
     nelec = sum(mc.nelecas)
 
     amat = []
-    for (s1, s2) in Stuples:
+    for (s1, s2) in stuples:
         if s1 == s2:  # SS part
             nelec_a, nelec_b = _get_alpha_beta(nelec, s1)
-            amat.append(_gen_linkstr_index((0,0)), ncasorb, nelec_a, nelec_b)
+            amat.append(_gen_linkstr_index((0,0), ncasorb, nelec_a, nelec_b))
         elif s1 + 2 == s2:  # SS+1 part
             nelec_a, nelec_b = _get_alpha_beta(nelec, s1+2)
-            amat.append(_gen_linkstr_index((-1,1)), ncasorb, nelec_a, nelec_b)
+            amat.append(_gen_linkstr_index((-1,1), ncasorb, nelec_a, nelec_b))
         elif s1 == s2 + 2: # SS-1 part
             nelec_a, nelec_b = _get_alpha_beta(nelec, s1-2)
-            amat.append(_gen_linkstr_index((1,-1)), ncasorb, nelec_a, nelec_b)
+            amat.append(_gen_linkstr_index((1,-1), ncasorb, nelec_a, nelec_b))
         else: # No connection
             amat.append(0)
 
@@ -140,42 +137,56 @@ def assemble_amat(siso):
 
 def assemble_civecs(siso):
     '''
-    
+    Assemble the ci vectors for the model space.
+    args:
+        siso:
+            instance of class SISO
+    returns:
+        cimat: list
     '''
     mc = siso.mc
     ci_mc = mc.ci
     twoslst = siso.twoslst
     statelst = siso.statelis
-    assert len(statelst) == len(ci_mc)
 
     cimat = []
+
     for i in range(len(twoslst)):
+        start_idx = int(np.sum(statelst[:twoslst[i]]))
         try:
-            cimat.append(np.asarray(ci_mc[int(np.sum(statelst[:twoslst[i]])):int(np.sum(statelst[:twoslst[i] + 1]))]))
+            end_idx = int(np.sum(statelst[:twoslst[i] + 1]))
         except IndexError:
-            cimat.append(np.asarray(ci_mc[int(np.sum(statelst[:twoslst[i]])):int(np.sum(statelst))]))
+            end_idx = int(np.sum(statelst))
+
+        cimat.append(np.asarray(ci_mc[start_idx:end_idx]))
+
     imds = siso.imds
     imds.c = cimat
+    
     return cimat
 
 def assemble_energy(siso):
     '''
+    Assemble the energy for the model space.
     '''
     mc = siso.mc
     e_states = mc.e_states
     twoslst = siso.twoslst
     tottwos = len(twoslst)
     statelst = siso.statelis
-    assert len(statelst) == len(e_states)
 
     e = []
     for i in range(tottwos):
+        start_idx = int(np.sum(statelst[:twoslst[i]]))
         try:
-            e.append(np.asarray(e_states[int(np.sum(statelst[:twoslst[i]])):int(np.sum(statelst[:twoslst[i] + 1]))]))
+            end_idx = int(np.sum(statelst[:twoslst[i] + 1]))
         except IndexError:
-            e.append(np.asarray(e_states[int(np.sum(statelst[:twoslst[i]])):int(np.sum(statelst))]))
+            end_idx = int(np.sum(statelst))
+        e.append(np.asarray(e_states[start_idx:end_idx]))
+
     imds = siso.imds
     imds.e = e
+
     return e
 
 def compute_cg_coefficients(S, Ms=0):
@@ -190,6 +201,7 @@ def compute_cg_coefficients(S, Ms=0):
             a list of Clebsch-Gordan coefficients for each state
     """
     assert Ms in (0, 1, -1), "Ms should be either 0, 1 or -1."
+    
     Ms_map = {0:S+1, 1:S+3, -1:S-1}
     
     ss = symbols('S')
@@ -202,7 +214,7 @@ def compute_cg_coefficients(S, Ms=0):
         for g1 in range(sbra):
             phase = (-1) ** (g0 + S / 2 - (g1 - S / 2))
             for g2 in range(sket):
-                g[g0, g1, g2] += phase * CG.Wigner3j(ss/2, -(g1 - ss/2), 
+                g[g0, g1, g2] += phase * cg.Wigner3j(ss/2, -(g1 - ss/2),
                                                      1, 1 - g0, 
                                                      ss/2 + Ms, g2 - ss/2 - Ms
                                                     ).subs(ss,S).doit()
@@ -221,25 +233,25 @@ def compute_dmat(siso):
         return np.ascontiguousarray(array.flatten()).ctypes.data_as(ctypes.POINTER(dtype))
 
     for i, (s1,s2) in enumerate(stuples):
-
         if s1 == s2:  # SS part
             S = s1
             iS = np.where(twoslst == S)[0][0]
-            zmat = imds.z[iS] # SOC integrals
-            civec = imds.c[iS] # CI vectors
-            civec = civec.astype(np.complex128) # Change the dtype to complex128
-            alphamat, betamat = imds.a[iS] # coupling coefficients
-            b = np.zeros((3, *civec.shape), dtype=np.complex128)
-
+            zmat = imds.z # SOC integrals
+            civecket = imds.c[iS].astype(np.complex128) # CI vectors
+            civecbra = civecket
+            alphamat, betamat = imds.a[i] # coupling coefficients
+            b = np.zeros((3, *civecket.shape), dtype='complex')
+    
             # Instead of passing all of these shapes, I am passing a single shape array
             shapearray = np.array([*b.shape, 
                                    alphamat.shape[1], 
                                    betamat.shape[1], 
                                    zmat.shape[1], 
-                                   civec.shape[1], 
-                                   civec.shape[2]],
+                                   civecket.shape[1], 
+                                   civecket.shape[2]],
                                    dtype=np.int32, order='C')
 
+            b = np.ascontiguousarray(b.flatten())
 
             libsiso.SOCcompute_ss.argtypes = [
                 ctypes.POINTER(ctypes.c_double),  # zmat
@@ -249,46 +261,49 @@ def compute_dmat(siso):
                 ctypes.POINTER(ctypes.c_int),     # betadet
                 ctypes.POINTER(ctypes.c_int)      # shapearray
             ]
-
+        
             libsiso.SOCcompute_ss(
                 flatten_to_ptr(zmat, ctypes.c_double),
-                flatten_to_ptr(civec, ctypes.c_double),
-                flatten_to_ptr(b, ctypes.c_double),
+                flatten_to_ptr(civecket, ctypes.c_double),
+                b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
                 flatten_to_ptr(shapearray, ctypes.c_int)
                 )
+        
+            b = b.reshape(3, *civecket.shape)
             
-            b = b.reshape(3, *civec.shape)
-            g = compute_cg_coefficients(S, Ms=0)
+            # WE TDM
+            w = np.einsum('kij, mnij->mnk', civecbra, b)
 
-            w = np.einsum('kij, mnij->mnk', civec, b)
+            # Multiply by the Clebsch-Gordan coefficients
+            g = compute_cg_coefficients(S, Ms=0)
             d = np.einsum('mij, mkl->kilj', g, w)
+           
             d_col.append(d)
         
         elif s1 + 2 == s2:  # SS+1 part
             S = s1
             iS = np.where(twoslst == S)[0][0]
             iSp = np.where(twoslst == S + 2)[0][0]
-            zmat = imds.z[iS] # SOC integrals
-
-            civec = imds.c[iS] # CI vectors
-            civec = civec.astype(np.complex128) # Change the dtype to complex128
-            civecbra = imds.c[iSp]
-            civecbra = civecbra.astype(np.complex128)
-
-            alphamat, betamat = imds.a[iS] # coupling coefficients
-            b = np.zeros((3, civec.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
+            zmat = imds.z # SOC integrals
+            civecket = imds.c[iS].astype(np.complex128) # CI vectors
+            civecbra = imds.c[iSp].astype(np.complex128)
+            alphamat, betamat = imds.a[i] # coupling coefficients
+            b = np.zeros((3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
+            
 
             # Instead of passing all of these shapes, I am passing a single shape array
             shapearray = np.array([*b.shape, 
                                    alphamat.shape[1], 
                                    betamat.shape[1], 
                                    zmat.shape[1], 
-                                   civec.shape[1], 
-                                   civec.shape[2]],
+                                   civecket.shape[1], 
+                                   civecket.shape[2]],
                                    dtype=np.int32, order='C')
             
+            b = np.ascontiguousarray(b.flatten())
+
             libsiso.SOCcompute_ssp.argtypes = [
                 ctypes.POINTER(ctypes.c_double),  # zmat
                 ctypes.POINTER(ctypes.c_double),  # civecs
@@ -300,17 +315,20 @@ def compute_dmat(siso):
 
             libsiso.SOCcompute_ssp(
                 flatten_to_ptr(zmat, ctypes.c_double),
-                flatten_to_ptr(civec, ctypes.c_double),
-                flatten_to_ptr(b, ctypes.c_double),
+                flatten_to_ptr(civecket, ctypes.c_double),
+                b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
                 flatten_to_ptr(shapearray, ctypes.c_int)
                 )
             
-            b = b.reshape(3, civec.shape[0], civecbra.shape[1], civecbra.shape[2])
-
-            g = compute_cg_coefficients(S, Ms=1)
+            b = b.reshape(3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2])
+            
+            # WE TDM
             w = np.einsum('kij, mnij->mnk', civecbra, b)
+
+            # Multiply by the Clebsch-Gordan coefficients
+            g = compute_cg_coefficients(S, Ms=1)
             d = np.einsum('mij, mkl->kilj', g, w)
             d_col.append(d)
         
@@ -318,25 +336,24 @@ def compute_dmat(siso):
             S = s1
             iS = np.where(twoslst == S)[0][0]
             iSm = np.where(twoslst == S - 2)[0][0]
-            zmat = imds.z[iS] # SOC integrals
+            zmat = imds.z # SOC integrals
+            civecket = imds.c[iS].astype(np.complex128) # CI vectors
+            civecbra = imds.c[iSm].astype(np.complex128)
+            alphamat, betamat = imds.a[i] # coupling coefficients
 
-            civec = imds.c[iS] # CI vectors
-            civec = civec.astype(np.complex128) # Change the dtype to complex128
-            civecbra = imds.c[iSm]
-            civecbra = civecbra.astype(np.complex128)
-
-            alphamat, betamat = imds.a[iS] # coupling coefficients
-            b = np.zeros((3, civec.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
+            b = np.zeros((3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2]), dtype='complex')
 
             # Instead of passing all of these shapes, I am passing a single shape array
             shapearray = np.array([*b.shape, 
                                    alphamat.shape[1], 
                                    betamat.shape[1], 
                                    zmat.shape[1], 
-                                   civec.shape[1], 
-                                   civec.shape[2]],
+                                   civecket.shape[1], 
+                                   civecket.shape[2]],
                                    dtype=np.int32, order='C')
             
+            b = np.ascontiguousarray(b.flatten())
+
             libsiso.SOCcompute_ssm.argtypes = [
                 ctypes.POINTER(ctypes.c_double),  # zmat
                 ctypes.POINTER(ctypes.c_double),  # civecs
@@ -347,21 +364,26 @@ def compute_dmat(siso):
             ]
             libsiso.SOCcompute_ssm(
                 flatten_to_ptr(zmat, ctypes.c_double),
-                flatten_to_ptr(civec, ctypes.c_double),
-                flatten_to_ptr(b, ctypes.c_double),
+                flatten_to_ptr(civecket, ctypes.c_double),
+                b.ctypes.data_as(ctypes.POINTER(ctypes.c_double)),
                 flatten_to_ptr(alphamat, ctypes.c_int),
                 flatten_to_ptr(betamat, ctypes.c_int),
                 flatten_to_ptr(shapearray, ctypes.c_int)
                 )
-            b = b.reshape(3, civec.shape[0], civecbra.shape[1], civecbra.shape[2])
-            g = compute_cg_coefficients(S, Ms=-1)
+            
+            b = b.reshape(3, civecket.shape[0], civecbra.shape[1], civecbra.shape[2])
+
+            # WE TDM
             w = np.einsum('kij, mnij->mnk', civecbra, b)
+
+            # Multiply by the Clebsch-Gordan coefficients
+            g = compute_cg_coefficients(S, Ms=-1)
             d = np.einsum('mij, mkl->kilj', g, w)
             d_col.append(d)
 
         else: # No connection
             d_col.append(0)
-        
+
     return d_col
 
 def compute_hamiltonian(siso):
@@ -382,8 +404,7 @@ def compute_hamiltonian(siso):
     imds = siso.imds
     d = imds.d
     e = imds.e
-    
-    h_col = [[0] * totalspins for i in range(totalspins)]
+    h_col = [[0] * totalspins for _ in range(totalspins)]
 
     for i in range(totalspins):
         for j in range(totalspins):
@@ -399,12 +420,12 @@ def compute_hamiltonian(siso):
                 else:
                     coeff = 0.0
                 
-                h = coeff * d[indt].reshpae(nstates, nstates, order='C')
+                h = coeff * d[indt].reshape(nstates, nstates, order='C')
 
                 for ns in range(nstates):
                     n1 = divmod(ns, S+1)[0]
                     h[ns, ns] += e[i][n1]
-
+            
             elif s1 + 2 == s2:
                 S = s1
                 nstatesa = counter[S]
@@ -465,10 +486,10 @@ class _IMDS:
     ----------
         self.z   :   (3,ncas,ncas)
         self.a   :   (nSt,2,ncia||b,4)
-        self.b          (3, nstates nciam ncib) for given nS
-        self.c      :   (nS,nstates,ncia,ncib)
-        self.d      :   (nS,nstates,nstates)
-        self.e      :   (nS,nstates)
+        self.b   :   (3, nstates nciam ncib) for given nS
+        self.c   :   (nS,nstates,ncia,ncib)
+        self.d   :   (nS,nstates,nstates)
+        self.e   :   (nS,nstates)
     """
     def __init__(self):
         self.zmat = None
@@ -493,11 +514,11 @@ class SISO(lib.StreamObject):
         self.soc2e = soc2e
         self.ham = ham
         self.imds = _IMDS()
-        self.initialize(modelspace)
+        self.initialize_(modelspace)
         self.sanity_checks()
         self.dump_flags()
 
-    def initialize(self, modelspace):
+    def initialize_(self, modelspace):
         statelis= sorted(modelspace, key=lambda x: x[1])
         SMlst = [state[1] - 1 for state in statelis]
         statelis_ = np.zeros(max(SMlst) + 1, dtype=int)
@@ -522,48 +543,76 @@ class SISO(lib.StreamObject):
     def dump_flags(self):
         log = logger.Logger(self.mc.stdout, self.mc.verbose)
         log.note(" ")
-        log.note("Spin-Orbit Coupling using Quasi-Degenerate Perturbation Theory")
-        log.note("Spin-Orbit Mean Field Integrals: %s", self.somf)
-        log.note("Atomic Mean Field Integrals: %s", self.amf)
-        log.note("Molecular Mean Field Integrals: %s", self.mmf)
-        log.note("Include 1e SOC integrals: %s", self.soc1e)
-        log.note("Include 2e SOC integrals: %s", self.soc2e)
-        log.note("SOC Hamiltonian: %s", self.ham)
-        log.note("Speed of ligt: %.2f m/s", lib.param.LIGHT_SPEED)
+        log.info('******** %s ********', self.__class__)
+        log.note("somf: %s", self.somf)
+        log.note("amfi: %s", self.amf)
+        log.note("mmfi: %s", self.mmf)
+        log.note("1e soc: %s", self.soc1e)
+        log.note("2e soc: %s", self.soc2e)
+        log.note("ham: %s", self.ham)
+        log.note("speed of light: %.2f a.u.", lib.param.LIGHT_SPEED)
         log.note(" ")
+        self._initialize()
         return self
     
     def build_imds(self):
         return build_imds(self)
 
-    def _calc_h(self):
+    def compute_hamiltonian(self):
         return compute_hamiltonian(self)
 
     def kernel(self):
         return kernel(self)
     
+    def _initialize(self):
+        mc = self.mc
+
+        log = logger.Logger(mc.stdout, mc.verbose)
+
+        nroots=len(self.mc.e_states)
+        e_states = np.array(mc.e_states)
+        e_states = e_states[np.argsort(e_states)]
+        ss = np.array(mc.fcisolver.states_spin_square(mc.ci, mc.ncas, mc.nelecas)[0])
+        ss = ss[np.argsort(e_states)]
+
+        log.note(" ")
+        log.info('******** %s ********', "Spin Orbit Free Energetics")
+        for i in range(nroots):
+            log.note(" State %d Total Energy = %.12g  S2 = %.2g",
+                    i,
+                    e_states[i],
+                    ss[i])
+
+        log.note(" ")
+        log.info('******** %s ********',"Relative Spin Orbit Free Energetics")
+        log.note("State         Relative Energy(au)   Relative Energy(eV)   Relative Energy(cm^-1)")
+        for i in range(nroots):
+            log.note(" {:<10} {:>20.9f} {:>20.5f} {:>20.5f}".format(
+                i,
+                e_states[i] - e_states[0],
+                au2ev * (e_states[i] - e_states[0]),
+                au2cminv * (e_states[i] - e_states[0])))
+            
     def _finalize(self):
         mc = self.mc
 
         log = logger.Logger(mc.stdout, mc.verbose)
-        nroots=len(self.mag_energy)
+        nroots=len(self.si_energies)
         log.note(" ")
-        log.note("*** Spin Orbit Coupling Energetics ***")
-        log.note(" ")
+        log.info('******** %s ********',"Spin Orbit Coupling Energetics")
         for i in range(nroots):
             log.note(" SO-CASSI State %d Total Energy = %.12g ",
                     i,
-                    self.mag_energy[i])
+                    self.si_energies[i])
 
         log.note(" ")
-        log.note("*** Relative Spin Orbit Coupling Energetics ***")
-        log.note(" ")
-        log.note("SO State       Relative Energy(au)   Relative Energy(eV)   Relative Energy(cm$^{-1}$)")
+        log.info('******** %s ********',"Relative Spin Orbit Coupling Energetics")
+        log.note("SO State       Relative Energy(au)   Relative Energy(eV)   Relative Energy(cm^-1)")
         for i in range(nroots):
             log.note(" {:<10} {:>20.9f} {:>20.5f} {:>20.5f}".format(
                 i,
-                self.mag_energy[i] - self.mag_energy[0],
-                au2ev * (self.mag_energy[i] - self.mag_energy[0]),
-                au2cminv * (self.mag_energy[i] - self.mag_energy[0])))
+                self.si_energies[i] - self.si_energies[0],
+                au2ev * (self.si_energies[i] - self.si_energies[0]),
+                au2cminv * (self.si_energies[i] - self.si_energies[0])))
        
 

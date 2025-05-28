@@ -19,6 +19,7 @@
 SOC Integral Generation Based on Atomic Mean-field Approximation (AMFI)
 and One-Center Approximation for both 1e and 2e integrals.
 '''
+
 import copy
 import scipy
 import numpy as np
@@ -212,23 +213,21 @@ def compute_soc2e_jk(pmol, dm0, mo1, mo3):
     # Directly using the ao2mo.general to get the 2e integrals in the cGTO basis
 
     # Columb like matrix
+    vj = np.zeros((3, nao, nao))
     hso2e_ = ao2mo.general(pmol, (mo3, mo1, mo3, mo1),
                            intor='int2e_p1vxp1',aosym='s1',comp=3,compact=True)
-
-    # vj = np.einsum('yijkl,lk->yij', ao2mo.restore(1, hso2e_, nao)
-    vj = np.asarray([np.tensordot(ao2mo.restore(1, hso2e_[i], nao),
-                                   dm0, axes=([2, 3], [1, 0])) for i in range(3)])
+    vj = np.asarray([np.einsum('ijkl,lk->ij', ao2mo.restore(1, hso2e_[i], nao),
+                                   dm0) for i in range(3)])
 
     # Exchange like matrix
-    hso2e_=ao2mo.general(pmol, (mo3, mo1, mo1, mo3),
+    hso2e_ = ao2mo.general(pmol, (mo3, mo1, mo1, mo3),
                          intor='int2e_p1vxp1',aosym='s1',comp=3,compact=True)
 
-    # vk = np.einsum('yijkl,jk->yil', ao2mo.restore(1, hso2e_, nao), dm0)
-    # vk += np.einsum('yijkl,li->ykj', ao2mo.restore(1, hso2e_, nao), dm0)
-    vk = np.asarray([
-        np.tensordot(ao2mo.restore(1, hso2e_[i], nao), dm0, axes=([1, 2], [0, 1])) +
-        np.tensordot(ao2mo.restore(1, hso2e_[i], nao), dm0, axes=([0, 3], [1, 0]))
-        for i in range(3)])
+    vk = np.zeros_like(vj)
+    for i in range(3):
+        hso2etemp = ao2mo.restore(1, hso2e_[i], nao)
+        vk[i] = np.einsum('ijkl,jk->il', hso2etemp, dm0)
+        vk[i] += np.einsum('ijkl,li->kj', hso2etemp, dm0)
 
     del hso2e_
 
