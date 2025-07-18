@@ -60,8 +60,12 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
 
     assert somf, "Explicit 2e SOC integrals are implemented yet."
 
-    if mol.has_ecp():
-        raise NotImplementedError("ECP is not supported yet.")
+    if mol.has_ecp and len(mol._pseudo) > 0:
+        raise NotImplementedError("SOC with GTH-PP is not implemented yet.")
+
+    if mol.has_ecp and mol.has_ecp_soc:
+        hso =  -0.5j*mol.intor('ECPso', comp=3)
+        return hso
 
     assert soc1e or soc2e, "Atleast one of the SOC integrals should be included."
 
@@ -83,7 +87,7 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
         hso = hso1e
     elif soc2e:
         hso = hso2e
-    return np.array([x.T for x in hso])
+    return hso
 
 def sacasscf_solver(mc, states, weights=None, ms=None):
     '''

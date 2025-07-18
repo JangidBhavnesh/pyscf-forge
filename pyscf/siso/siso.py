@@ -528,8 +528,6 @@ class SISO(lib.StreamObject):
         """
         assert self.ham in ('BP', 'DK'), "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
         assert self.somf, "Explicit 2e SOC integrals are not implemented yet."
-        if self.mc._scf.mol.has_ecp():
-            raise NotImplementedError("ECP is not supported yet.")
         assert self.soc1e or self.soc2e, "At least one of the SOC integrals should be included."
         return self
 
