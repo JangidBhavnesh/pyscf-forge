@@ -61,11 +61,18 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
     assert somf, "Explicit 2e SOC integrals are implemented yet."
 
     if mol.has_ecp and len(mol._pseudo) > 0:
-        raise NotImplementedError("SOC with GTH-PP is not implemented yet.")
+        from pyscf.pbc import gto as pbcgto
+        if isinstance(mol, pbcgto.cell.Cell):
+            from pyscf.pbc.gto.pseudo.pp_int import get_gth_pp_so as get_gth_pp_so_pbc
+            hso = -0.5j*get_gth_pp_so_pbc(mol)
+        else:
+            from pyscf.gto.pp_int import get_gth_pp_so
+            hso = -0.5j*get_gth_pp_so(mol)
+        return hso.conj().transpose(0,2,1)
 
     if mol.has_ecp and mol.has_ecp_soc:
-        hso =  -0.5j*mol.intor('ECPso', comp=3)
-        return hso
+        hso =  1j*mol.intor('ECPso', comp=3)
+        return hso.conj().transpose(0,2,1)
 
     assert soc1e or soc2e, "Atleast one of the SOC integrals should be included."
 
