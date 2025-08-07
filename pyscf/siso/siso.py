@@ -376,7 +376,6 @@ def compute_dmat(siso):
 
         else: # No connection
             d_col.append(0)
-
     return d_col
 
 def compute_hamiltonian(siso):
@@ -470,7 +469,7 @@ def kernel(siso):
         f"Hamiltonian is not Hermitian, max deviation: {np.max(np.abs(hso - hso.conj().T))}"
     siso.si_energies, siso.si_vecs = np.linalg.eigh(hso)
     siso._finalize()
-    return siso.si_energies, siso.si_vecs
+    return siso.si_energies, siso.si_vecs, hso
 
 class _IMDS:
     """
