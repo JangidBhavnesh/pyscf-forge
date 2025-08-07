@@ -126,10 +126,10 @@ def _get_dipole_integrals(mol, origin='CHARGE_CENTER'):
     return ao_dip
 
 def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
-    '''
+    """
     Get the one-electron properties for the given model space.
-    Basically it computes <\Psi_i|\hat{O}|\Psi_j> for the one electron 
-    operator \hat{O}.
+    Basically it computes r"<Psi_i|O|Psi_j>" for the one electron
+    operator O.
     args:
         mc: mcscf object
             SA-CAS or L-PDFT object
@@ -144,7 +144,7 @@ def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
             List of spin-orbit interaction matrices for each multiplicity group
         edipinterac: list
             List of electric dipole interaction matrices for each multiplicity group
-    '''
+    """
     ncas = mc.ncas
     nelecas = mc.nelecas
 
@@ -155,7 +155,7 @@ def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
 
     modelspace = sorted(modelspace, key=lambda x: x[1])
     modelspace = [x[:2] for x in modelspace]  # Keep only nroots and imult
-    
+
     orbangmoment = []
     amfiinterac = []
     edipinterac = []
@@ -180,7 +180,7 @@ def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
         orbangmoment.append(orbLmat)
         amfiinterac.append(amfimat)
         edipinterac.append(edipmat)
-        
+
         nroot0 += nroots
 
     assert sum([x[0] for x in modelspace]) == len(mc.ci), "Something went wrong."
@@ -242,10 +242,10 @@ def generate_aniso_data(mol, mc, modelspace, mysiso, hso, origin='CHARGE_CENTER'
     # Energy data
     data['eso'] = mysiso.si_energies
     data['esfs'] = np.array(mc.e_states)
-    
+
     # Generate the required operators
     sfs_lmat, sfs_amfi, sfs_edip = get_1e_prop(mc, modelspace, origin)
-    
+
     sos_spin = []
     sos_magmom = []
     sos_edipmat = []
@@ -254,16 +254,15 @@ def generate_aniso_data(mol, mc, modelspace, mysiso, hso, origin='CHARGE_CENTER'
         spininter = [np.stack(spin_operators(spin), axis=0) for spin in spinstates]
         lmatsos = generate_sos_basis(sfs_lmat[i], mult)
         edipsos = generate_sos_basis(sfs_edip[i], mult)
-        
+
         sos_edipmat.append(edipsos)
-        
+
         sos_spin.append(np.stack([block_diag(*[a[i] for a in spininter]) for i in range(3)], axis=0))
-        
+
         sos_magneticmoment_ =  -ge *np.stack([block_diag(*[a[i] for a in spininter]) for i in range(3)], axis=0)
         sos_magneticmoment_ -= 1j * lmatsos
         sos_magmom.append(sos_magneticmoment_)
 
-    
     # Spin orbit free data
     sfs_lmat = unpack_sfs_basis(sfs_lmat)
     sfs_amfi = unpack_sfs_basis(sfs_amfi)
