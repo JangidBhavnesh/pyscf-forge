@@ -24,7 +24,7 @@ from sympy import symbols
 from sympy.physics.quantum import cg
 from itertools import product
 from functools import reduce
-from pyscf import scf, lib, fci
+from pyscf import scf, lib, fci, mcpdft
 from pyscf.siso import socaddons
 import ctypes
 
@@ -530,7 +530,19 @@ class SISO(lib.StreamObject):
         if self.mc._scf.mol.has_ecp():
             raise NotImplementedError("ECP is not supported yet.")
         assert self.soc1e or self.soc2e, "At least one of the SOC integrals should be included."
+        # In case of L-PDFT sort the eigen-states accoarding to spin-states.
+        if isinstance(self.mc, mcpdft.MultiStateMCPDFTSolver):
+            self.sort_eigenstates_forlpdft()
         return self
+
+    def sort_eigenstates_forlpdft(self):
+        '''
+        Sorting the L-PDFT ci-vecs and energies accoarding to spin-states.
+        '''
+        ss = self.mc.fcisolver.states_spin_square(self.mc.ci, self.mc.ncas, self.mc.nelecas)[0]
+        idx = np.argsort(ss)
+        self.mc.ci = [self.mc.ci[i] for i in idx]
+        self.mc.e_states = [self.mc.e_states[i] for i in idx]
 
     def dump_flags(self):
         log = logger.Logger(self.mc.stdout, self.mc.verbose)

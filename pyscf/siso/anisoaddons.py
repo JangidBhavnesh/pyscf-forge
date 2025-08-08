@@ -203,7 +203,7 @@ def generate_aniso_data(mol, mc, modelspace, mysiso, hso, origin='CHARGE_CENTER'
         origin: str
             Origin for the integrals, default is 'CHARGE_CENTER'
         ham: str
-            SOC Hamiltonia: 'BP' or 'DK'
+            SOC Hamiltonian: 'BP' or 'DK'
     returns:
         data: dict
             Dictionary containing the required data for ANISO calculations
@@ -212,7 +212,7 @@ def generate_aniso_data(mol, mc, modelspace, mysiso, hso, origin='CHARGE_CENTER'
     data = {}
 
     # Basic headings
-    heading = 'PySCF Interface to SINGLEANISO'
+    heading = 'PySCF Interface to SINGLE_ANISO'
     data['source'] = heading
     data['format'] =  '2021'
 
@@ -383,6 +383,34 @@ class ANISOFileWriter:
             for ky, val in self.data.items():
                 f.write(self.write_general(ky, val))
 
-def write_aniso_file(filename, data):
+def write_aniso_file(filename, data, backend='OpenMolcas'):
+    '''
+    Based on the backend of the SINGLE_ANISO, write the ANISO file.
+    args:
+        filename: str
+            Name of ANISO file
+        data: dict
+            Data to write to the ANISO file
+        backend: str
+            SINGLE_ANISO backend (OpenMolcas or Orca)
+    '''
+    if backend == 'OpenMolcas':
+        writer = ANISOFileWriter(filename, data)
+        writer.save_to_file()
+    elif backend == 'Orca':
+        rename_map = {"angmom_x": "angmom_xi", "angmom_y": "angmom_yi",
+                      "angmom_z": "angmom_zi"}
+        data = {rename_map.get(k, k): v for k, v in data.items()}
+
+        _keys={'format','nss','nstate','nmult','imult','nroot','szproj',
+               'multiplicity','eso','esfs','angmom_xi','angmom_yi','angmom_zi',
+               'amfi_x','amfi_y','amfi_z','edmom_x','edmom_y','edmom_z','magn_xr',
+               'magn_xi','magn_yr','magn_yi','magn_zr','magn_zi','spin_xr','spin_xi',
+               'spin_yr','spin_yi','spin_zr','spin_zi','edipm_xr','edipm_xi','edipm_yr',
+               'edipm_yi','edipm_zr','edipm_zi','eigenr','eigeni','hsor','hsoi'}
+        data = {k: v for k, v in data.items() if k in _keys}
+    else:
+        raise ValueError(f"Unknown SINGLE_ANISO backend: {backend}")
+
     writer = ANISOFileWriter(filename, data)
     writer.save_to_file()
