@@ -1,11 +1,12 @@
 # Generate the required data used by ANISO to compute the static magnetic properties.
 
 import numpy as np
+import sympy as sp
 from itertools import product
 from functools import reduce
 from scipy.linalg import block_diag
 from pyscf import lib
-import sympy as sp
+from pyscf.x2c import sfx2c1e
 
 # Constants
 ge = 2.00231930436182   # Taken from pyscf
@@ -97,20 +98,45 @@ def get_guage_origin(mol,origin):
             center = charges.dot(coords)/charges.sum()
         else:
             raise RuntimeError ("Gauge origin is not recognized")
-    elif isinstance(origin,str):
+    elif isinstance(origin,tuple):
         center = origin
     else:
         raise RuntimeError ("Gauge origin must be a string or tuple")
     return center
 
-def _get_lxyz_integrals(mol, origin):
+def _get_lxyz_integrals(mol, origin='CHARGE_CENTER', pcc=True):
     '''
     Note these integrals are antisymm.
     '''
     center = get_guage_origin(mol,origin)
-    with mol.with_common_orig(center):
-        ints = mol.intor('int1e_cg_irxp', comp=3, hermi=2)
+    if pcc:
+        x2cobj = sfx2c1e.SpinFreeX2C(mol)
+        with mol.with_rinv_origin(center):
+            xmol = x2cobj.get_xmol()[0]
+            xint = xmol.intor('int1e_cg_irxp')
+            pxpint = xmol.intor('int1e_cg_pirxpp', hermi=2)
+            c1 = 0.5/lib.param.LIGHT_SPEED
+            ints = x2cobj.picture_change((xint, pxpint * c1**2))
+    else:
+        with mol.with_common_orig(center):
+            ints = mol.intor('int1e_cg_irxp', comp=3) 
     return ints
+
+def _get_dipole_integrals(mol, origin='CHARGE_CENTER', pcc=True):
+    center = get_guage_origin(mol,origin)
+    if pcc:
+        x2cobj = sfx2c1e.SpinFreeX2C(mol)
+        with mol.with_rinv_origin(center):
+            xmol = x2cobj.get_xmol()[0]
+            nao = xmol.nao
+            rint = xmol.intor('int1e_r', hermi=2)
+            prpint = xmol.intor('int1e_sprsp', hermi=2).reshape(3,4,nao,nao)[:,3]
+            c1 = 0.5/lib.param.LIGHT_SPEED
+            ao_dip = x2cobj.picture_change((rint, prpint * c1**2))
+    else:
+        with mol.with_common_orig(center):
+            ao_dip = mol.intor_symmetric('int1e_r', comp=3)
+    return ao_dip
 
 def _get_soc_integrals(mol, origin='CHARGE_CENTER', ham='DK'):
     from pyscf.siso import socaddons
@@ -119,13 +145,7 @@ def _get_soc_integrals(mol, origin='CHARGE_CENTER', ham='DK'):
     hso /= 1j
     return hso.real
 
-def _get_dipole_integrals(mol, origin='CHARGE_CENTER'):
-    center = get_guage_origin(mol,origin)
-    with mol.with_common_orig(center):
-        ao_dip = mol.intor_symmetric('int1e_r', comp=3)
-    return ao_dip
-
-def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
+def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', pcc=True, ham='DK'):
     """
     Get the one-electron properties for the given model space.
     Basically it computes r"<Psi_i|O|Psi_j>" for the one electron
@@ -149,9 +169,9 @@ def get_1e_prop(mc, modelspace, origin='CHARGE_CENTER', ham='DK'):
     nelecas = mc.nelecas
 
     mo_cas = mc.mo_coeff[:, mc.ncore:mc.ncas+mc.ncore]
-    ints_mo = _basis_transformation(_get_lxyz_integrals(mc._scf.mol, origin), mo_cas)
+    ints_mo = _basis_transformation(_get_lxyz_integrals(mc._scf.mol, origin, pcc), mo_cas)
     ints_so = _basis_transformation(_get_soc_integrals(mc._scf.mol, origin, ham=ham), mo_cas)
-    ints_dip = _basis_transformation(_get_dipole_integrals(mc._scf.mol, origin), mo_cas)
+    ints_dip = _basis_transformation(_get_dipole_integrals(mc._scf.mol, origin, pcc), mo_cas)
 
     modelspace = sorted(modelspace, key=lambda x: x[1])
     modelspace = [x[:2] for x in modelspace]  # Keep only nroots and imult
