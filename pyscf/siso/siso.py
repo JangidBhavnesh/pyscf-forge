@@ -17,6 +17,7 @@
 
 '''
 Quasi-Degenerate Perturbation Theory Based Spin-Orbit Coupling Treatment
+Also known as State-Interaction Spin-Orbit (SI-SO) method.
 '''
 
 import numpy as np
@@ -40,7 +41,7 @@ au2cminv = 219474.6313705
 
 # Forked from: https://github.com/IrisA144/liblan_preview
 
-def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DK'):
+def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DKH'):
     """
     Computing the SOC integrals.
 
@@ -58,7 +59,7 @@ def calculate_zmat(siso, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True,
         soc2e:
             include 2e SOC integrals.
         ham:
-            SOC Hamiltonian (BP or DK)
+            SOC Hamiltonian (BP or DKH)
     Returns:
         zsoc:
             SOC integrals of dimension (3, ncas, ncas)
@@ -498,7 +499,7 @@ class SISO(lib.StreamObject):
     """
     _keys=['statelst', 'twoslst', 'stuples','si_energies', 'si_vecs']
 
-    def __init__(self, mc, modelspace, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DK'):
+    def __init__(self, mc, modelspace, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DKH'):
         self.mc = mc
         self.somf = somf
         self.amf = amf
@@ -526,7 +527,7 @@ class SISO(lib.StreamObject):
         """
         Perform sanity checks on the input parameters.
         """
-        assert self.ham in ('BP', 'DK'), "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
+        assert self.ham in ('BP', 'DKH'), "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
         assert self.somf, "Explicit 2e SOC integrals are not implemented yet."
         if self.mc._scf.mol.has_ecp():
             raise NotImplementedError("ECP is not supported yet.")

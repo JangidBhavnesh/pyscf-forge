@@ -26,7 +26,7 @@ from pyscf.siso import amfi as amfIntegrals
 
 logger = lib.logger
 
-def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DK', dm=None):
+def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DKH', dm=None):
     '''
     Wrapper for the SOC integral generation
     1e and 2e integrals are generated using the amfi module.
@@ -46,7 +46,7 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
         soc2e: bool
             include 2e SOC integrals.
         ham: str
-            SOC Hamiltonian (BP or DK)
+            SOC Hamiltonian (BP or DKH)
         dm: np.array (nao, nao), optional
             density matrix of parent wavefunction.
     returns:
@@ -55,7 +55,7 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
     '''
 
     # Sanity checks
-    assert ham in ('BP', 'DK'),\
+    assert ham in ('BP', 'DKH'),\
         "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
 
     assert somf, "Explicit 2e SOC integrals are implemented yet."
@@ -148,8 +148,8 @@ if __name__ == "__main__":
     dm = mf.make_rdm1()
 
     # AMFI Integrals
-    hso = socintegrals(mol, ham='DK')
+    hso = socintegrals(mol, ham='DKH')
 
     # MMFI Integrals
-    # hso_mmfi = socintegrals(mol, amf=False, mmf=True, ham='DK', dm=dm)
+    # hso_mmfi = socintegrals(mol, amf=False, mmf=True, ham='DKH', dm=dm)
 

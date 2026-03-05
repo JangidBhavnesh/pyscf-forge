@@ -93,7 +93,7 @@ def compute_amfi_dm(mol, atomic_configuration=elements.CONFIGURATION):
         lib.logger.debug1(mol, 'Atom %s, E = %.12g', k, v[0])
     return dm
 
-def compute_kinematic_factors(pmol, contr_coeff, ham='DK'):
+def compute_kinematic_factors(pmol, contr_coeff, ham='DKH'):
     '''
     Computing the kinematical factors.
     E1:  sqrt((2*p**2)*c**2 + c**4)
@@ -105,9 +105,9 @@ def compute_kinematic_factors(pmol, contr_coeff, ham='DK'):
         contr_coeff: np.array (ncGTO, npGTO)
             uncontracted coefficients of the basis functions
         ham: str
-            Hamiltonian type, 'bp' or 'dk'
+            Hamiltonian type, 'bp' or 'dkh'
             bp: Breit-Pauli
-            dk: Douglas-Kroll up to first order
+            dkh: Douglas-Kroll-Hess up to first order
     returns
         contr_coeff_1:  np.array (npGTO, ncGTO)
             contracted coefficient decorated with kinematical factor of type-1
@@ -233,7 +233,7 @@ def compute_soc2e_jk(pmol, dm0, mo1, mo3):
 
     return vj, vk
 
-def compute_hso1(mol, ham='DK'):
+def compute_hso1(mol, ham='DKH'):
     '''
     Compute the 1e SOC integrals in pGTO basis and transform them to cGTO basis
     using decorated contraction coefficients.
@@ -245,9 +245,9 @@ def compute_hso1(mol, ham='DK'):
             npGTO: int
                 number of primitive GTOs
         ham: str
-            Hamiltonian type, 'bp' or 'dk'
+            Hamiltonian type, 'bp' or 'dkh'
             bp: Breit-Pauli
-            dk: Douglas-Kroll up to first order
+            dkh: Douglas-Kroll-Hess up to first order
     returns:
         hso1: np.array (3, nao, nao)
             1e SOC integrals in cGTO basis
@@ -270,7 +270,7 @@ def compute_hso1(mol, ham='DK'):
                                           contr_coeff2.T, hso1etemp, contr_coeff2)
     return hso1e
 
-def compute_hso2(mol, dm0, ham='DK'):
+def compute_hso2(mol, dm0, ham='DKH'):
     '''
     Compute the 2e SOC integrals in pGTO basis and transform them to cGTO basis
     using decorated contraction coefficients.
@@ -284,9 +284,9 @@ def compute_hso2(mol, dm0, ham='DK'):
         dm0: np.array (nao, nao)
             density matrix
         ham: str
-            Hamiltonian type, 'bp' or 'dk'
+            Hamiltonian type, 'bp' or 'dkh'
             bp: Breit-Pauli
-            dk: Douglas-Kroll up to first order
+            dkh: Douglas-Kroll-Hess up to first order
     returns:
         vj: np.array (3, nao, nao)
             J-like matrix in cGTO basis
@@ -314,7 +314,7 @@ def compute_hso2(mol, dm0, ham='DK'):
     del vj, vk
     return hso2e
 
-def compute_soc_integrals(mol, dm, ham='DK'):
+def compute_soc_integrals(mol, dm, ham='DKH'):
     '''
     Computing the 1e + 2e SOC integrals.
     args:
@@ -323,9 +323,9 @@ def compute_soc_integrals(mol, dm, ham='DK'):
         dm: np.array (nao, nao)
             density matrix of parent wavefunction.
         ham: str
-            Hamiltonian type, 'bp' or 'dk'
+            Hamiltonian type, 'bp' or 'dkh'
             bp: Breit-Pauli
-            dk: Douglas-Kroll up to first order
+            dkh: Douglas-Kroll-Hess up to first order
     return:
         hso: tuple ((3, nao, nao), (3, nao, nao))
             1e and 2e SOC integrals in cGTO basis
