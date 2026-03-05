@@ -218,4 +218,5 @@ set_target_properties (clib_siso PROPERTIES
     OUTPUT_NAME "siso")
 
 add_subdirectory(sfnoci)
+add_subdirectory(pwscf)
 
