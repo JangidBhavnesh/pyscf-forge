@@ -160,7 +160,9 @@ def get_1e_prop(mc, modelspace, mysiso, origin='CHARGE_CENTER', pcc=False):
     mmf = mysiso.mmf
     soc1e = mysiso.soc1e
     soc2e = mysiso.soc2e
-    dm = mysiso.dm
+    dm = None
+    if mmf:
+        dm = mc.make_rdm1()
     mo_cas = mc.mo_coeff[:, mc.ncore:mc.ncas+mc.ncore]
     ints_mo = _basis_transformation(_get_lxyz_integrals(mc._scf.mol, origin, pcc), mo_cas)
     ints_so = _basis_transformation(_get_soc_integrals(mc._scf.mol, origin, ham=ham,
@@ -261,7 +263,7 @@ def generate_aniso_data(mol, mc, modelspace, mysiso, origin='CHARGE_CENTER', ham
     data['esfs'] = np.array(mc.e_states)
 
     # Generate the required operators
-    sfs_lmat, sfs_amfi, sfs_edip = get_1e_prop(mc, modelspace, origin, mysiso)
+    sfs_lmat, sfs_amfi, sfs_edip = get_1e_prop(mc, modelspace, mysiso, origin)
 
     sos_spin = []
     sos_magmom = []
