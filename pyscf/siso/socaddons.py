@@ -118,6 +118,10 @@ def sacasscf_solver(mc, states, weights=None, ms=None):
 
     states= sorted(states, key=lambda x: x[1])
 
+    spin_mult = [x[1] for x in states]
+    assert len({m % 2 for m in spin_mult}) == 1,\
+          "Model space contains both odd and even spin multiplicities."
+
     states = [state if len(state) > 2
               else state + (None,) * (3 - len(state))
               for state in states]
@@ -138,8 +142,9 @@ if __name__ == "__main__":
     xyz ='''O  0.00000000   0.08111156   0.00000000
             H  0.78620605   0.66349738   0.00000000
             H -0.78620605   0.66349738   0.00000000'''
+
     mol = gto.M(atom=xyz, basis='cc-pvtz-dk', verbose=5)
-    mf = scf.RHF(mol).run()
+    mf = scf.RHF(mol).sfx2c1e().run()
     dm = mf.make_rdm1()
 
     # AMFI Integrals
