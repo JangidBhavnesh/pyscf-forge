@@ -2,11 +2,11 @@ from pyscf import gto, scf, mcpdft
 from pyscf.mcscf import avas
 from pyscf import siso
 
-mol = gto.Mole(atom="N 0 0 0", 
+mol = gto.Mole(atom="N 0 0 0",
                spin=3,
-               max_memory=10000, 
+               max_memory=10000,
                basis="ano@5s4p2d1f", #=ANO_RCC_VTZP
-               verbose=4) 
+               verbose=4)
 mol.build()
 
 mf = scf.ROHF(mol).sfx2c1e()
@@ -22,6 +22,6 @@ mc.conv_tol = 1e-8
 mc.kernel(mo_coeff)
 
 # QDPT-SOC for L-PDFT
-mysiso = siso.SISO(mc,  [(8, 2),(1,4)], ham='DK', amf=True)
+mysiso = siso.SISO(mc,  [(8, 2),(1,4)], ham='DKH', amf=True)
 mysiso.kernel()
 
