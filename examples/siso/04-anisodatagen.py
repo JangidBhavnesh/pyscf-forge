@@ -19,6 +19,7 @@ mol.spin = 5
 mol.charge = 1
 mol.verbose = 4
 mol.max_memory = 120000
+mol.output = 'DyO.log'
 mol.build()
 
 # 2. SCF calculation
@@ -33,7 +34,7 @@ mo_coeff = avas.kernel(mf, ['Dy 4f',], minao=mol.basis)[2]
 # 4. State-averaged CASSCF followed by state interaction:
 modelspace = [(21,6),]
 mc = mcscf.CASSCF(mf, 7, 9)
-mc = siso.sacasscf_solver(mc, [(21, 6)])
+mc = siso.sacasscf_solver(mc, [(21, 6)]) # 21 Sextets
 mc.max_cycle_macro = 200
 mc.kernel(mo_coeff)
 
@@ -50,6 +51,6 @@ write_aniso_file('DyO.aniso', data = mydata, backend='Orca')
 # 7. To run the single_aniso module, you will need to create the input file for the single_aniso, in addition to
 # the aniso data file created above (DyO.aniso) and binaries of the single_aniso module. Currently you can access these via
 # OpenMolcas or Orca.
-# For more details: see: https://www.faccts.de/docs/orca/6.0/manual/contents/detailed/single_aniso.html
+# For more details on how to use SingleANISO: see: https://www.faccts.de/docs/orca/6.0/manual/contents/detailed/single_aniso.html
 # https://molcas.gitlab.io/OpenMolcas/sphinx/users.guide/programs/single_aniso.html
 
