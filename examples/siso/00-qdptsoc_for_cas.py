@@ -6,7 +6,7 @@ from pyscf import siso
 # Example to perform the two-step state interaction calculation including the
 # spin-orbit coupling effects. The first step is to perform a state-averaged CASSCF
 # calculation, and the second step is to perform the QDPT-SOC calculation using the
-# state-averaged CASSCF wavefunctions as the model space.
+# state-averaged CASSCF wave functions as the model space.
 
 # 1. Define the molecule
 mol = gto.Mole(atom="Al 0 0 0",
