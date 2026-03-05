@@ -471,7 +471,7 @@ def kernel(siso):
         f"Hamiltonian is not Hermitian, max deviation: {np.max(np.abs(hso - hso.conj().T))}"
     siso.si_energies, siso.si_vecs = np.linalg.eigh(hso)
     siso._finalize()
-    return siso.si_energies, siso.si_vecs, hso
+    return siso.si_energies, siso.si_vecs
 
 class _IMDS:
     """

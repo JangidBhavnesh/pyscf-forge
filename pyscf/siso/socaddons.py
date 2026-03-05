@@ -56,7 +56,7 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
 
     # Sanity checks
     assert ham in ('BP', 'DKH'),\
-        "Only Breit-Pauli or Douglas-Kroll Hamiltonian are available."
+        "Only Breit-Pauli or Douglas-Kroll-Hess Hamiltonian are available."
 
     assert somf, "Explicit 2e SOC integrals are implemented yet."
 
