@@ -518,6 +518,12 @@ class _IMDS:
         self.c = None
         self.e = None
         self.d = None
+        self.ssc_integrals = None
+        self.q0 = None
+        self.ssc_reduced = None
+        self.q0_pairs = None
+        self.ssc_reduced_pairs = None
+        self.hssc = None
 
 class SISO(lib.StreamObject):
     """
@@ -671,6 +677,11 @@ class SISO(lib.StreamObject):
 
     def compute_soc_hamiltonian(self):
         return compute_soc_hamiltonian(self)
+
+    def compute_ssc_hamiltonian(self, *args, **kwargs):
+        """Build the same-multiplicity spin--spin coupling Hamiltonian."""
+        from pyscf.siso.ss_coupling import compute_ssc_hamiltonian
+        return compute_ssc_hamiltonian(self, *args, **kwargs)
 
     def kernel(self):
         return kernel(self)
