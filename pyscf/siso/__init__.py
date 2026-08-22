@@ -17,4 +17,15 @@
 
 from pyscf.siso.socaddons import (compute_nevpt2_energies, sacasscf_solver,
                                  socintegrals, state_average_solver)
+from pyscf.siso.ss_coupling import (SSC_PHYSICAL_PREFACTOR,
+                                    assemble_ssc_hamiltonian_block,
+                                    compute_ssc_hamiltonian,
+                                    contract_ssc_integrals_q0,
+                                    make_quintet_density_q0,
+                                    rank2_cg_coefficients)
+from pyscf.siso.ss_int_helper import (cartesian_to_spherical,
+                                      compute_ssc_integrals,
+                                      compute_ssc_integrals_ri,
+                                      ground_triplet_levels,
+                                      triplet_zfs_parameters)
 from pyscf.siso.siso import SISO
