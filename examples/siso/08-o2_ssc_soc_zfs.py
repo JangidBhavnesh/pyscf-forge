@@ -58,18 +58,25 @@ mol = gto.M(
     verbose=4,
 )
 
-mf = scf.ROHF(mol).density_fit().sfx2c1e().run()
+mf = scf.ROHF(mol).density_fit().sfx2c1e()
+mf.chkfile = 'mf.chk'
+mf.kernel()
+
 mo_coeff = avas.kernel(mf, ['O 2p'], minao=mol.basis)[2]
 
 # Four singlet and four triplet roots in a CAS(8,6) O 2p active space.
 modelspace = [(4, 1), (4, 3)]
-mc = mcscf.CASSCF(mf, 6, 8)
-mc = siso.state_average_solver(mc, modelspace, )
+from pyscf import lib
+mo_coeff = lib.chkfile.load(mf.chkfile, 'mcscf/mo_coeff')
+mc = mcpdft.CASSCF(mf, 'tPBE', 6, 8)
+mc = siso.state_average_solver(mc, modelspace,ms='lin')
 mc.conv_tol = 1e-9
 mc.run(mo_coeff)
 
 my_siso = siso.SISO(mc, modelspace, ham='DKH')
 my_siso.build_imds()
+my_siso.kernel()
+
 h_soc_interaction = my_siso.compute_soc_hamiltonian()
 h_soc = my_siso.compute_hamiltonian()
 h_spin_free = h_soc - h_soc_interaction
