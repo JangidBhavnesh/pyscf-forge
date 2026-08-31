@@ -23,9 +23,8 @@ from sympy.physics.quantum.cg import CG
 
 from pyscf import df, fci
 from pyscf.data import nist
-from pyscf.siso.ss_int_helper import (cartesian_to_spherical,
-                                      compute_ssc_integrals,
-                                      compute_ssc_integrals_ri)
+from pyscf.siso.ss_int_helper import cartesian_to_spherical
+from pyscf.siso.sscint import get_ssc_integrals
 
 
 # The electron magnetic moment is -g_e/2 in atomic units.  The square removes
@@ -521,16 +520,11 @@ def compute_ssc_hamiltonian(siso, ssc_integrals=None, *, use_df=True,
 
     if ssc_integrals is None:
         mo_cas = mc.mo_coeff[:, mc.ncore:mc.ncore + ncas]
-        if use_df:
-            if auxbasis is None:
-                auxbasis = df.addons.make_auxbasis(
-                    mc._scf.mol, mp2fit=True)
-            cartesian = compute_ssc_integrals_ri(
-                mc._scf.mol, mo_coeff=mo_cas, auxbasis=auxbasis)
-        else:
-            cartesian = compute_ssc_integrals(
-                mc._scf.mol, mo_coeff=mo_cas)
-        spherical = cartesian_to_spherical(cartesian)
+        if use_df and auxbasis is None:
+            auxbasis = df.addons.make_auxbasis(
+                mc._scf.mol, mp2fit=True)
+        spherical = get_ssc_integrals(
+            mc._scf.mol, mo_cas, auxbasis=auxbasis, use_df=use_df)
     else:
         ssc_integrals = np.asarray(ssc_integrals)
         if ssc_integrals.shape == (3, 3) + (ncas,) * 4:

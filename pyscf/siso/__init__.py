@@ -28,4 +28,5 @@ from pyscf.siso.ss_int_helper import (cartesian_to_spherical,
                                       compute_ssc_integrals_ri,
                                       ground_triplet_levels,
                                       triplet_zfs_parameters)
+from pyscf.siso.sscaddons import compute_D_and_E
 from pyscf.siso.siso import SISO

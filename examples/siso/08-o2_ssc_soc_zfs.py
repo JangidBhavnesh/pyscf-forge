@@ -26,27 +26,8 @@ the ground triplet are identified by their overlap with its spin-free M_S
 components.
 """
 
-import numpy as np
-
 from pyscf import gto, mcpdft, scf, siso, mcscf
-from pyscf.data.nist import HARTREE2WAVENUMBER
 from pyscf.mcscf import avas
-from pyscf.siso.ss_int_helper import (ground_triplet_levels,
-                                      triplet_zfs_parameters)
-
-
-
-def print_zfs(label, hamiltonian, reference_indices):
-    energies, weights = ground_triplet_levels(
-        hamiltonian, reference_indices)
-    d_value, e_value, levels = triplet_zfs_parameters(energies)
-    conversion = HARTREE2WAVENUMBER
-    print(f'{label:>12}  D = {d_value * conversion: .9f} cm^-1  '
-          f'E = {e_value * conversion: .9f} cm^-1')
-    print(f'{"":>12}  centered levels = '
-          f'{np.array2string(levels * conversion, precision=9)} cm^-1')
-    print(f'{"":>12}  ground-triplet weights = '
-          f'{np.array2string(weights, precision=9)}')
 
 
 mol = gto.M(
@@ -59,48 +40,20 @@ mol = gto.M(
 )
 
 mf = scf.ROHF(mol).density_fit().sfx2c1e()
-mf.chkfile = 'mf.chk'
+# mf.chkfile = 'mf.chk'
 mf.kernel()
 
 mo_coeff = avas.kernel(mf, ['O 2p'], minao=mol.basis)[2]
 
 # Four singlet and four triplet roots in a CAS(8,6) O 2p active space.
 modelspace = [(4, 1), (4, 3)]
-from pyscf import lib
-mo_coeff = lib.chkfile.load(mf.chkfile, 'mcscf/mo_coeff')
 mc = mcpdft.CASSCF(mf, 'tPBE', 6, 8)
 mc = siso.state_average_solver(mc, modelspace,ms='lin')
-mc.conv_tol = 1e-9
-mc.run(mo_coeff)
+mc.kernel(mo_coeff)
 
-my_siso = siso.SISO(mc, modelspace, ham='DKH')
-my_siso.build_imds()
+my_siso = siso.SISO(mc, modelspace, ham='DKH', ssc=True)
 my_siso.kernel()
 
-h_soc_interaction = my_siso.compute_soc_hamiltonian()
-h_soc = my_siso.compute_hamiltonian()
-h_spin_free = h_soc - h_soc_interaction
-h_ssc = my_siso.compute_ssc_hamiltonian(use_df=True)
-
-h_soc = 0.5 * (h_soc + h_soc.conj().T)
-h_spin_free = 0.5 * (h_spin_free + h_spin_free.conj().T)
-h_ssc = 0.5 * (h_ssc + h_ssc.conj().T)
-h_ssc_only = h_spin_free + h_ssc
-h_total = h_soc + h_ssc
-
-# The four singlets precede the three M_S components of the lowest triplet.
-reference_indices = np.arange(4, 7)
-triplet_block = np.ix_(reference_indices, reference_indices)
-
-np.set_printoptions(precision=9, suppress=True)
-print('\nDirect ground-triplet interaction blocks in cm^-1')
-print('SOC:')
-print(np.real_if_close(
-    h_soc_interaction[triplet_block] * HARTREE2WAVENUMBER))
-print('SSC:')
-print(np.real_if_close(h_ssc[triplet_block] * HARTREE2WAVENUMBER))
-
-print('\nTriplet zero-field-splitting parameters')
-print_zfs('SOC', h_soc, reference_indices)
-print_zfs('SSC', h_ssc_only, reference_indices)
-print_zfs('SOC + SSC', h_total, reference_indices)
+# With no arguments, analyze the first root of every supported multiplicity
+# in the model space.  Here that is the lowest triplet root.
+siso.compute_D_and_E(my_siso, mltp=[3,], nroots=[1,])

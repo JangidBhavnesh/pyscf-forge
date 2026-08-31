@@ -160,6 +160,7 @@ class KnownValues(unittest.TestCase):
             ({'soc1e': False, 'soc2e': False}, ValueError),
             ({'somf': False}, NotImplementedError),
             ({'soc1e': 1}, TypeError),
+            ({'ssc': 1}, TypeError),
         ]
         for options, exception in invalid_options:
             with self.subTest(options=options):
