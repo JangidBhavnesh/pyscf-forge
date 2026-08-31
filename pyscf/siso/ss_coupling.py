@@ -23,8 +23,7 @@ from sympy.physics.quantum.cg import CG
 
 from pyscf import df, fci
 from pyscf.data import nist
-from pyscf.siso.ss_int_helper import cartesian_to_spherical
-from pyscf.siso.sscint import get_ssc_integrals
+from pyscf.siso.sscint import cartesian_to_spherical, get_ssc_integrals
 
 
 # The electron magnetic moment is -g_e/2 in atomic units.  The square removes

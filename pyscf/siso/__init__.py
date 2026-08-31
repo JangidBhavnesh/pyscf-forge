@@ -23,10 +23,12 @@ from pyscf.siso.ss_coupling import (SSC_PHYSICAL_PREFACTOR,
                                     contract_ssc_integrals_q0,
                                     make_quintet_density_q0,
                                     rank2_cg_coefficients)
-from pyscf.siso.ss_int_helper import (cartesian_to_spherical,
-                                      compute_ssc_integrals,
-                                      compute_ssc_integrals_ri,
-                                      ground_triplet_levels,
-                                      triplet_zfs_parameters)
-from pyscf.siso.sscaddons import compute_D_and_E
+from pyscf.siso.sscaddons import (compute_D_and_E, ground_triplet_levels,
+                                  triplet_zfs_parameters)
+from pyscf.siso.sscint import (cartesian_to_spherical,
+                               compute_ssc_integrals,
+                               compute_ssc_integrals_mo,
+                               compute_ssc_integrals_ri,
+                               compute_ssc_integrals_ri_mo,
+                               get_ssc_integrals)
 from pyscf.siso.siso import SISO

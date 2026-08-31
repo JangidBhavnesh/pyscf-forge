@@ -25,8 +25,7 @@ from pyscf.siso.ss_coupling import (assemble_ssc_hamiltonian_block,
                                     compute_ssc_hamiltonian,
                                     make_quintet_density_q0,
                                     rank2_cg_coefficients)
-from pyscf.siso.ss_int_helper import (cartesian_to_spherical,
-                                      compute_ssc_integrals)
+from pyscf.siso.sscint import cartesian_to_spherical, compute_ssc_integrals
 
 
 def _spin_excitation(ci, spin, p, q, norb, nelec):

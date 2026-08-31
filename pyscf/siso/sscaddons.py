@@ -27,6 +27,67 @@ _SUPPORTED_MULTIPLICITIES = (3, 4, 5)
 _MIN_PROJECTION_SINGULAR_VALUE = 0.9
 
 
+def triplet_zfs_parameters(levels):
+    r"""Extract conventional ``D`` and ``E`` from three spin-one levels.
+
+    The levels are matched to the eigenvalues of
+
+    .. math::
+
+        H_\mathrm{ZFS} = D[S_z^2-S(S+1)/3]
+        + E(S_x^2-S_y^2), \qquad S=1,
+
+    using the conventional principal-axis choice ``|D| >= 3 E``.
+    """
+    levels = np.asarray(levels)
+    if levels.shape != (3,):
+        raise ValueError("three triplet energy levels are required")
+    if not np.issubdtype(levels.dtype, np.number):
+        raise TypeError("triplet energy levels must be numeric")
+    if not np.all(np.isfinite(levels)):
+        raise ValueError("triplet energy levels must be finite")
+    if np.iscomplexobj(levels):
+        if not np.allclose(levels.imag, 0.0, atol=1e-12, rtol=0.0):
+            raise ValueError("triplet energy levels must be real")
+        levels = levels.real
+
+    centered_levels = np.sort(levels.astype(float, copy=True))
+    centered_levels -= centered_levels.mean()
+    axial = np.argmax(np.abs(centered_levels))
+    transverse = np.delete(centered_levels, axial)
+    d_value = -1.5 * centered_levels[axial]
+    e_value = 0.5 * abs(transverse[1] - transverse[0])
+    return d_value, e_value, centered_levels
+
+
+def ground_triplet_levels(hamiltonian, reference_indices):
+    """Select three SI eigenstates by overlap with a spin-free triplet root."""
+    hamiltonian = np.asarray(hamiltonian)
+    if (hamiltonian.ndim != 2
+            or hamiltonian.shape[0] != hamiltonian.shape[1]):
+        raise ValueError("hamiltonian must be a square matrix")
+    if not np.issubdtype(hamiltonian.dtype, np.number):
+        raise TypeError("hamiltonian must contain numeric values")
+    if not np.all(np.isfinite(hamiltonian)):
+        raise ValueError("hamiltonian must contain only finite values")
+
+    reference_indices = np.asarray(reference_indices)
+    if (reference_indices.shape != (3,)
+            or not np.issubdtype(reference_indices.dtype, np.integer)):
+        raise ValueError("reference_indices must contain three integers")
+    if (len(np.unique(reference_indices)) != 3
+            or np.any(reference_indices < 0)
+            or np.any(reference_indices >= hamiltonian.shape[0])):
+        raise ValueError("reference_indices must be unique matrix indices")
+
+    hermitian = 0.5 * (hamiltonian + hamiltonian.conj().T)
+    energies, vectors = np.linalg.eigh(hermitian)
+    weights = np.sum(np.abs(vectors[reference_indices]) ** 2, axis=0)
+    selected = np.argsort(weights)[-3:]
+    selected = selected[np.argsort(energies[selected])]
+    return energies[selected], weights[selected]
+
+
 def _validate_requests(mysiso, mltp, nroots):
     """Validate multiplicities and return requested root counts."""
     if mltp is None:
