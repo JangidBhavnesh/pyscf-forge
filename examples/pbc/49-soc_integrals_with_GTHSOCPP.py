@@ -30,3 +30,27 @@ mol = cell.to_mol()
 mol.build(False, False)
 
 hso_1c = -0.5j * gth_soc.get_gth_pp_so(mol)
+
+cell = gto.Cell()
+cell.a = np.eye(3) * 3.5668
+cell.atom = """
+    C 0.0    0.0    0.0
+    C 0.8917 0.8917 0.8917
+    C 1.7834 1.7834 0.0
+    C 2.6751 2.6751 0.8917
+    C 1.7834 0.0    1.7834
+    C 2.6751 0.8917 2.6751
+    C 0.0    1.7834 1.7834
+    C 0.8917 2.6751 2.6751
+"""
+cell.basis = "gth-szv"
+cell.pseudo = "gth-pade"
+cell.verbose = 0
+cell.build()
+
+from pyscf.pbc import tools
+supercell = tools.super_cell(cell, (5, 5, 5))
+
+hsoc  = gth_soc.get_gth_pp_so(supercell)
+
+print("SOC integrals for the primitive cell:", hsoc.shape)
