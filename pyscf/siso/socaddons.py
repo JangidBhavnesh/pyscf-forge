@@ -21,6 +21,7 @@ Helper Functions for SOC
 
 import numpy as np
 from pyscf import lib, mcscf, mrpt, symm
+from pyscf import gth_soc
 from pyscf.csf_fci import csf_solver
 from pyscf.siso import amfi as amfIntegrals
 
@@ -267,6 +268,14 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
     ham = ham.upper()
     if not somf:
         raise NotImplementedError("Explicit 2e SOC integrals are not implemented yet")
+
+    # GTH pseudopotentials provide their own one-electron SOC operator.  This
+    # is distinct from a conventional ECP, for which the AMFI implementation
+    # below is still unavailable.
+    pseudo = getattr(mol, '_pseudo', None)
+    if pseudo:
+        hso = -0.5j * gth_soc.get_gth_pp_so(mol)
+        return hso.conj().transpose(0, 2, 1)
 
     if mol.has_ecp():
         raise NotImplementedError("ECP is not supported yet.")

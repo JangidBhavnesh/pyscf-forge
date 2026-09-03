@@ -576,7 +576,10 @@ class SISO(lib.StreamObject):
         if not self.somf:
             raise NotImplementedError(
                 "Explicit 2e SOC integrals are not implemented yet")
-        if self.mc._scf.mol.has_ecp():
+        # GTH pseudopotentials have a dedicated SOC integral implementation;
+        # conventional ECPs remain unsupported.
+        mol = self.mc._scf.mol
+        if mol.has_ecp() and not getattr(mol, '_pseudo', None):
             raise NotImplementedError("ECP is not supported yet.")
         if not self.soc1e and not self.soc2e:
             raise ValueError("At least one of soc1e and soc2e must be enabled")
