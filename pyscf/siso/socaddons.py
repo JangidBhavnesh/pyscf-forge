@@ -274,7 +274,9 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
     # below is still unavailable.
     pseudo = getattr(mol, '_pseudo', None)
     if pseudo:
-        hso = -0.5j * gth_soc.get_gth_pp_so(mol)
+        # The GTH contraction is the coefficient of the Pauli matrices,
+        # whereas SISO contracts these integrals with S = sigma / 2.
+        hso = -1.0j * gth_soc.get_gth_pp_so(mol)
         return hso.conj().transpose(0, 2, 1)
 
     if mol.has_ecp():
