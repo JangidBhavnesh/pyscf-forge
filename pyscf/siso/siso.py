@@ -405,6 +405,10 @@ def compute_soc_hamiltonian(siso):
             SOC matrix of dimension (nstates, nstates), where nstates is the
             sum of nroots * spin_multiplicity over the model space.
     """
+    cached = getattr(siso.imds, 'hsoc_interaction', None)
+    if cached is not None:
+        return cached
+
     statelst = siso.statelis
     twoslst = siso.twoslst
     totalspins = len(twoslst)
@@ -449,7 +453,9 @@ def compute_soc_hamiltonian(siso):
                 h = np.zeros((nstatesa, nstatesb), dtype=np.complex128)
             h_col[i][j] = h
 
-    return np.block(h_col)
+    soc_hamiltonian = np.block(h_col)
+    imds.hsoc_interaction = soc_hamiltonian
+    return soc_hamiltonian
 
 
 def compute_hamiltonian(siso):
@@ -457,14 +463,39 @@ def compute_hamiltonian(siso):
     Compute the total state-interaction Hamiltonian.
 
     The diagonal spin-free model-state energies are added to the SOC
-    Hamiltonian returned by :func:`compute_soc_hamiltonian`.
+    Hamiltonian returned by :func:`compute_soc_hamiltonian`.  When
+    ``siso.ssc`` is enabled, the spin--spin coupling Hamiltonian is included
+    as well.
     """
-    soc_hamiltonian = compute_soc_hamiltonian(siso)
-    spin_free_energies = np.concatenate([
-        np.repeat(siso.imds.e[i], twos + 1)
-        for i, twos in enumerate(siso.twoslst)
-    ])
-    return soc_hamiltonian + np.diag(spin_free_energies)
+    imds = siso.imds
+    spin_free = getattr(imds, 'hspinfree', None)
+    if spin_free is None:
+        spin_free_energies = np.concatenate([
+            np.repeat(imds.e[i], twos + 1)
+            for i, twos in enumerate(siso.twoslst)
+        ])
+        spin_free = np.diag(spin_free_energies)
+        imds.hspinfree = spin_free
+
+    hsoc = getattr(imds, 'hsoc', None)
+    if hsoc is None:
+        hsoc = spin_free + compute_soc_hamiltonian(siso)
+        imds.hsoc = hsoc
+    hamiltonian = hsoc.copy()
+
+    if getattr(siso, 'ssc', False):
+        hssc = getattr(imds, 'hssc', None)
+        if hssc is None:
+            hssc = siso.compute_ssc_hamiltonian()
+            imds.hssc = hssc
+        if hssc.shape != hamiltonian.shape:
+            raise ValueError(
+                'SSC Hamiltonian shape is inconsistent with the SISO model '
+                f'space: {hssc.shape} != {hamiltonian.shape}')
+        hamiltonian = hamiltonian + hssc
+
+    imds.htotal = hamiltonian
+    return hamiltonian
 
 
 def build_imds(siso):
@@ -482,6 +513,20 @@ def build_imds(siso):
     imds.c = assemble_civecs(siso)
     imds.e = assemble_energy(siso)
     imds.d = compute_dmat(siso)
+    # Rebuilding the spin-free/SOC intermediates invalidates any SSC matrix
+    # contracted with an earlier set of CI vectors or active orbitals.
+    imds.ssc_integrals = None
+    imds.q0 = None
+    imds.ssc_reduced = None
+    imds.q0_pairs = None
+    imds.ssc_reduced_pairs = None
+    imds.hssc = None
+    imds.hspinfree = None
+    imds.hsoc_interaction = None
+    imds.hsoc = None
+    imds.hssc_only = None
+    imds.htotal = None
+    siso.d_and_e = None
     return siso
 
 def kernel(siso):
@@ -490,13 +535,17 @@ def kernel(siso):
     """
     logger.debug(siso, 'Starting SI-SO kernel')
     siso.build_imds()
-    hso = siso.compute_hamiltonian()
-    hso_deviation = np.max(np.abs(hso - hso.conj().T))
-    if not np.allclose(hso, hso.conj().T):
+    hamiltonian = siso.compute_hamiltonian()
+    hamiltonian_deviation = np.max(
+        np.abs(hamiltonian - hamiltonian.conj().T))
+    if not np.allclose(hamiltonian, hamiltonian.conj().T):
         logger.warn(siso, 'Hamiltonian is not Hermitian; max deviation: %.3e. '
-                    'Symmetrizing before diagonalization.', hso_deviation)
-    hso = 0.5 * (hso + hso.conj().T)
-    siso.si_energies, siso.si_vecs = np.linalg.eigh(hso)
+                    'Symmetrizing before diagonalization.',
+                    hamiltonian_deviation)
+    hamiltonian = 0.5 * (hamiltonian + hamiltonian.conj().T)
+    if hasattr(siso, 'imds'):
+        siso.imds.htotal = hamiltonian
+    siso.si_energies, siso.si_vecs = np.linalg.eigh(hamiltonian)
     siso._finalize()
     return siso.si_energies, siso.si_vecs
 
@@ -518,6 +567,17 @@ class _IMDS:
         self.c = None
         self.e = None
         self.d = None
+        self.ssc_integrals = None
+        self.q0 = None
+        self.ssc_reduced = None
+        self.q0_pairs = None
+        self.ssc_reduced_pairs = None
+        self.hssc = None
+        self.hspinfree = None
+        self.hsoc_interaction = None
+        self.hsoc = None
+        self.hssc_only = None
+        self.htotal = None
 
 class SISO(lib.StreamObject):
     """
@@ -528,18 +588,25 @@ class SISO(lib.StreamObject):
         mc: converged state-averaged CAS object
         modelspace: Model-space entries ``(nroots, spinmult[, wfnsym])``.
             If None, the model space is read from ``mc``.
+        ssc: Include the direct electron spin--spin coupling Hamiltonian.
+            Default is ``False``.
     """
-    _keys = ['modelspace', 'statelst', 'twoslst', 'stuples',
-             'si_energies', 'si_vecs']
+    _keys = ['modelspace', 'statelst', 'twoslst', 'stuples', 'ssc',
+             'si_energies', 'si_vecs', 'd_and_e']
 
-    def __init__(self, mc, modelspace=None, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ham='DKH'):
+    def __init__(self, mc, modelspace=None, somf=True, amf=True, mmf=False,
+                 soc1e=True, soc2e=True, ham='DKH', ssc=False):
         self.mc = mc
+        self.stdout = mc.stdout
+        self.verbose = mc.verbose
         self.somf = somf
         self.amf = amf
         self.mmf = mmf
         self.soc1e = soc1e
         self.soc2e = soc2e
         self.ham = ham.upper() if isinstance(ham, str) else ham
+        self.ssc = ssc
+        self.d_and_e = None
         self.imds = _IMDS()
         self.initialize_(modelspace)
         self.sanity_checks()
@@ -567,10 +634,12 @@ class SISO(lib.StreamObject):
         Perform sanity checks on the input parameters.
         """
         flags = {'somf': self.somf, 'amf': self.amf, 'mmf': self.mmf,
-                 'soc1e': self.soc1e, 'soc2e': self.soc2e}
+                 'soc1e': self.soc1e, 'soc2e': self.soc2e,
+                 'ssc': self.ssc}
         if any(not isinstance(value, (bool, np.bool_))
                for value in flags.values()):
-            raise TypeError("somf, amf, mmf, soc1e, and soc2e must be boolean")
+            raise TypeError(
+                "somf, amf, mmf, soc1e, soc2e, and ssc must be boolean")
         if self.ham not in ('BP', 'DKH'):
             raise ValueError("ham must be 'BP' or 'DKH'")
         if not self.somf:
@@ -647,6 +716,7 @@ class SISO(lib.StreamObject):
         log.note("mmfi: %s", self.mmf)
         log.note("1e soc: %s", self.soc1e)
         log.note("2e soc: %s", self.soc2e)
+        log.note("ssc: %s", self.ssc)
         log.note("ham: %s", self.ham)
         log.note("model space: %s", self.modelspace)
         log.note("speed of light: %.8f a.u.", lib.param.LIGHT_SPEED)
@@ -662,6 +732,14 @@ class SISO(lib.StreamObject):
 
     def compute_soc_hamiltonian(self):
         return compute_soc_hamiltonian(self)
+
+    def compute_ssc_hamiltonian(self, *args, **kwargs):
+        """Build the spin--spin coupling Hamiltonian."""
+        from pyscf.siso.ss_coupling import compute_ssc_hamiltonian
+        hssc = compute_ssc_hamiltonian(self, *args, **kwargs)
+        self.imds.hssc_only = None
+        self.imds.htotal = None
+        return hssc
 
     def kernel(self):
         return kernel(self)

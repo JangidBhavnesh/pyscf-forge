@@ -158,6 +158,20 @@ class KnownValues(unittest.TestCase):
         assert_allclose(hamiltonian, reference, atol=1e-14)
         assert_allclose(hamiltonian, hamiltonian.conj().T, atol=1e-14)
 
+        hssc = np.diag([0.03, 0.02, -0.04, -0.01])
+        my_siso.ssc = True
+        my_siso.imds.hssc = None
+        my_siso.compute_ssc_hamiltonian = mock.Mock(return_value=hssc)
+        hamiltonian_ssc = siso.compute_hamiltonian(my_siso)
+        assert_allclose(hamiltonian_ssc, reference + hssc, atol=1e-14)
+        my_siso.compute_ssc_hamiltonian.assert_called_once_with()
+        self.assertIs(my_siso.imds.hssc, hssc)
+
+        # The cached contraction is reused by subsequent Hamiltonian builds.
+        assert_allclose(
+            siso.compute_hamiltonian(my_siso), reference + hssc, atol=1e-14)
+        my_siso.compute_ssc_hamiltonian.assert_called_once_with()
+
     def test_kernel_diagonalizes_hamiltonian(self):
         hso = np.asarray([[1.0, 0.2j], [-0.1j, 2.0]])
 
