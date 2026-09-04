@@ -23,7 +23,7 @@ from pyscf.data import nist
 from pyscf.lib import logger
 
 
-_SUPPORTED_MULTIPLICITIES = (3, 4, 5)
+_SUPPORTED_MULTIPLICITIES = (3, 4, 5, 7)
 _MIN_PROJECTION_SINGULAR_VALUE = 0.9
 
 
@@ -119,8 +119,8 @@ def _validate_requests(mysiso, mltp, nroots):
         ]
     if not multiplicities:
         raise ValueError(
-            "the SISO model space contains no triplet, quartet, or quintet "
-            "roots")
+            "the SISO model space contains no supported spin multiplets "
+            "(multiplicities 3, 4, 5, or 7)")
 
     validated_multiplicities = []
     for mult in multiplicities:
@@ -129,7 +129,8 @@ def _validate_requests(mysiso, mltp, nroots):
             raise TypeError("multiplicities in mltp must be integers")
         mult = int(mult)
         if mult not in _SUPPORTED_MULTIPLICITIES:
-            raise ValueError("mltp supports only multiplicities 3, 4, and 5")
+            raise ValueError(
+                "mltp supports only multiplicities 3, 4, 5, and 7")
         if mult in validated_multiplicities:
             raise ValueError("mltp must not contain duplicate multiplicities")
         if (mult not in modelspace_multiplicities
@@ -374,8 +375,9 @@ def compute_D_and_E(mysiso, mltp=(), nroots=None):
             have not yet been built, this function builds them.
         mltp : sequence of int, optional
             Multiplicities to analyze.  Supported values are ``3`` (triplet),
-            ``4`` (quartet), and ``5`` (quintet).  If omitted or empty, all
-            supported multiplicities present in the model space are used.
+            ``4`` (quartet), ``5`` (quintet), and ``7`` (septet, ``S=3``).
+            If omitted or empty, all supported multiplicities present in the
+            model space are used.
         nroots : sequence of int, optional
             Number of roots to analyze for each requested multiplicity,
             starting from its first model-space root.  If omitted or empty,

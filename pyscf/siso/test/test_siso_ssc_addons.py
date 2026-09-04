@@ -38,18 +38,20 @@ def _zfs_hamiltonian(spin, d_value, e_value):
 
 
 def _fake_siso(include_ssc=True):
-    multiplicities = (3, 4, 5)
-    spins = (1.0, 1.5, 2.0)
-    spin_free_energies = (-2.0, -1.5, -1.0)
+    multiplicities = (3, 4, 5, 7)
+    spins = (1.0, 1.5, 2.0, 3.0)
+    spin_free_energies = (-2.0, -1.5, -1.0, -0.5)
     soc_parameters = (
         (1.2e-4, 0.2e-4),
         (-0.8e-4, 0.1e-4),
         (0.6e-4, 0.05e-4),
+        (-0.4e-4, 0.06e-4),
     )
     ssc_parameters = (
         (0.3e-4, 0.04e-4),
         (0.2e-4, 0.03e-4),
         (-0.1e-4, 0.02e-4),
+        (0.15e-4, 0.01e-4),
     )
 
     dimension = sum(multiplicities)
@@ -65,8 +67,8 @@ def _fake_siso(include_ssc=True):
 
     output = io.StringIO()
     mysiso = SimpleNamespace(
-        statelis=[0, 0, 1, 1, 1],
-        twoslst=np.asarray([2, 3, 4]),
+        statelis=[0, 0, 1, 1, 1, 0, 1],
+        twoslst=np.asarray([2, 3, 4, 6]),
         ssc=include_ssc,
         stdout=output,
         verbose=4,
@@ -82,13 +84,13 @@ def _fake_siso(include_ssc=True):
 
 class KnownValues(unittest.TestCase):
 
-    def test_triplet_quartet_and_quintet_fits(self):
+    def test_triplet_quartet_quintet_and_septet_fits(self):
         mysiso, soc_parameters, ssc_parameters = _fake_siso()
         results = sscaddons.compute_D_and_E(
-            mysiso, mltp=[3, 4, 5], nroots=[1, 1, 1])
+            mysiso, mltp=[3, 4, 5, 7], nroots=[1, 1, 1, 1])
 
         self.assertIs(mysiso.d_and_e, results)
-        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results), 4)
         for result, soc_de, ssc_de in zip(
                 results, soc_parameters, ssc_parameters):
             np.testing.assert_allclose(
@@ -106,7 +108,7 @@ class KnownValues(unittest.TestCase):
                 result['total']['D_tensor'].shape, (3, 3))
 
         output = mysiso.stdout.getvalue()
-        for mult in (3, 4, 5):
+        for mult in (3, 4, 5, 7):
             heading = f'Multiplicity (2S+1): {mult}'
             self.assertIn(f'{heading}\n{"-" * len(heading)}', output)
         self.assertIn('Root no.', output)
@@ -146,11 +148,11 @@ class KnownValues(unittest.TestCase):
     def test_request_validation(self):
         mysiso, _, _ = _fake_siso()
         multiplicities, root_counts = sscaddons._validate_requests(
-            SimpleNamespace(statelis=[0, 0, 3, 2, 1]), (), None)
-        self.assertEqual(multiplicities, [3, 4, 5])
-        self.assertEqual(root_counts, [1, 1, 1])
+            SimpleNamespace(statelis=[0, 0, 3, 2, 1, 0, 2]), (), None)
+        self.assertEqual(multiplicities, [3, 4, 5, 7])
+        self.assertEqual(root_counts, [1, 1, 1, 1])
 
-        with self.assertRaisesRegex(ValueError, '3, 4, and 5'):
+        with self.assertRaisesRegex(ValueError, '3, 4, 5, and 7'):
             sscaddons.compute_D_and_E(mysiso, mltp=[2], nroots=[1])
         with self.assertRaisesRegex(ValueError, 'one count'):
             sscaddons.compute_D_and_E(
