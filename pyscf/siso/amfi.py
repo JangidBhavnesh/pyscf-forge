@@ -92,7 +92,8 @@ def compute_amfi_dm(mol, atomic_configuration=elements.CONFIGURATION):
         lib.logger.debug1(mol, 'Atom %s, E = %.12g', k, v[0])
     return dm
 
-def compute_kinematic_factors(pmol, contr_coeff, ham='DKH'):
+def compute_kinematic_factors(pmol, contr_coeff, ham='DKH',
+                              return_intermediates=False):
     '''
     Computing the kinematical factors.
     E1:  sqrt((2*p**2)*c**2 + c**4)
@@ -101,18 +102,26 @@ def compute_kinematic_factors(pmol, contr_coeff, ham='DKH'):
     args:
         pmol: pyscf.gto.Mole
             molecule object in pGTO basis
-        contr_coeff: np.array (ncGTO, npGTO)
+        contr_coeff: np.array (npGTO, ncGTO)
             uncontracted coefficients of the basis functions
         ham: str
-            Hamiltonian type, 'bp' or 'dkh'
-            bp: Breit-Pauli
-            dkh: Douglas-Kroll-Hess up to first order
+            Hamiltonian type, 'BP', 'DKH', or 'DKH2'. Note that DKH orders
+            share the same free-particle kinematical factors.
+        return_intermediates: bool
+            Also return the momentum-basis intermediates for the DKH2
+            one-electron correction. Default is False.
     returns
         contr_coeff_1:  np.array (npGTO, ncGTO)
             contracted coefficient decorated with kinematical factor of type-1
-        contr_coeff_2: np.array (ncGTO, npGTO)
+        contr_coeff_2: np.array (npGTO, ncGTO)
             contracted coefficient decorated with kinematical factor of type-2
+        intermediates: dict, optional
+            Momentum magnitudes, energies, factors, primitive AO coefficients
+            of the momentum basis, and contraction coefficients in that basis.
     '''
+    if not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH', 'DKH2'):
+        raise ValueError("ham must be 'BP', 'DKH', or 'DKH2'")
+    ham = ham.upper()
     # Some constants
     c = lib.param.LIGHT_SPEED # in atomic units
     c2 = c * c
@@ -131,6 +140,7 @@ def compute_kinematic_factors(pmol, contr_coeff, ham='DKH'):
     # to obatin the p2-basis
     t = reduce(np.dot, (sinvsq, t, sinvsq))
     teigval, teigvec = _diagonalize(t)
+    p2 = 2. * teigval
 
     # If the Hamiltonian is of type BP, we set the eigenvalues to zero
     if ham=='BP':
@@ -156,10 +166,71 @@ def compute_kinematic_factors(pmol, contr_coeff, ham='DKH'):
     r2_pos = np.dot(sinv, r2_pos)
     contr_coeff2 = np.dot(r2_pos, contr_coeff)
 
+    if return_intermediates:
+        # Keep these from the same diagonalization used to dress the
+        # contraction coefficients.
+        if np.any(p2 <= 0):
+            raise ValueError('DKH2 requires a positive kinetic spectrum; '
+                             'check the primitive basis for linear dependencies')
+        p2_coeff = np.dot(sinvsq, teigvec)
+        intermediates = dict(
+            p=np.sqrt(p2), e1=e1, r1=r1, r2=r2, p2_coeff=p2_coeff,
+            contr_coeff_p2=reduce(np.dot, (p2_coeff.T, s, contr_coeff)))
+        return contr_coeff1, contr_coeff2, intermediates
+
     del t, s, sinv, ssqrt, sinvsq, teigval, teigvec
     del e1, r1, r2, r1_pos, r2_pos
 
     return contr_coeff1, contr_coeff2
+
+def hso1e_secord(v, pvp, intermediates):
+    '''
+    See: JCP, 138, 104113 (2013), Appendix B, DOI: 10.1063/1.4793736
+
+    Second-order spin orbit integrals for DKH Hamiltonian. Only the 1e term
+    is included at the second order.
+
+    v is the atomic nuclear potential in primitive AOs; pvp holds
+    its int1e_sprinvsp components (x, y, z, scalar), including -Z. Return
+    three real antisymmetric matrices in contracted AOs, without the 2j
+    prefactor used by compute_soc_integrals.
+
+    Ganyushin and Neese, J. Chem. Phys. 138, 104113 (2013), Appendix B,
+    DOI: 10.1063/1.4793736, give -1/2 (E W^2 + W^2 E + 2 W E W).
+    In the normalized kinetically balanced small-component basis, the
+    positive-to-negative potential block is
+
+        O = -A V (p B) + B (sigma.p V sigma.p) (A/p).
+
+    With X_ij = O_ij/(E_i+E_j), its electronic correction is
+    (X O^dagger + O X^dagger)/2. X is a block of the generator, not the
+    anti-Hermitian W of Appendix B. Products below use the real quaternion
+    representation Q = Q_scalar + i sigma.Q_vector.
+    '''
+    p = intermediates['p']
+    e1 = intermediates['e1']
+    r1 = intermediates['r1']
+    r2 = intermediates['r2']
+    coeff = intermediates['p2_coeff']
+    v = reduce(np.dot, (coeff.T, v, coeff))
+    pvp = np.asarray([reduce(np.dot, (coeff.conj().T, q, coeff)) for q in pvp])
+
+    odd = r2[None, :, None] * pvp * (r1 / p)[None, None, :]
+    odd[3] -= r1[:, None] * v * (p * r2)[None, :]
+    generator = odd / (e1[:, None] + e1[None, :])
+
+    # Vector part of X O^dagger, including the vector-vector cross product.
+    # Adding its adjoint is antisymmetrization of the real vector matrices.
+    contr_coeff = intermediates['contr_coeff_p2']
+    correction = []
+    # Cartesian cyclic permutations: (x, y, z), (y, z, x), (z, x, y).
+    # For component i, (j, k) supplies the cross-product term X_j O_k^T - X_k O_j^T.
+    for i, j, k in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
+        vec = (generator[i] @ odd[3].T - generator[3] @ odd[i].T
+               + generator[j] @ odd[k].T - generator[k] @ odd[j].T)
+        vec = .5 * (vec - vec.T)
+        correction.append(reduce(np.dot, (contr_coeff.conj().T, vec, contr_coeff)))
+    return np.asarray(correction)
 
 def compute_soc2e_jk(pmol, dm0, mo1, mo3):
     """
@@ -244,13 +315,16 @@ def compute_hso1(mol, ham='DKH'):
             npGTO: int
                 number of primitive GTOs
         ham: str
-            Hamiltonian type, 'bp' or 'dkh'
-            bp: Breit-Pauli
-            dkh: Douglas-Kroll-Hess up to first order
+            'BP': Breit-Pauli; 
+            'DKH': first-order Douglas-Kroll-Hess;
+            'DKH2': second order DKH only the 1e part at 2nd order.
     returns:
         hso1: np.array (3, nao, nao)
-            1e SOC integrals in cGTO basis
+            1e SOC integrals in cGTO basis.
     '''
+    if not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH', 'DKH2'):
+        raise ValueError("ham must be 'BP', 'DKH', or 'DKH2'")
+    ham = ham.upper()
     nao = mol.nao_nr()
     hso1e = np.zeros((3,nao,nao))
     aoslice = mol.aoslice_by_atom()
@@ -258,15 +332,29 @@ def compute_hso1(mol, ham='DKH'):
 
     for i in range(mol.natm):
         b0, b1, p0, p1 = aoslice[i]
+        # In case of a ghost atom.
+        if p0 == p1 or mol.atom_charge(i) == 0:
+            continue
         atoms._bas = mol._bas[b0:b1]
         pmol, ctr_coeff = atoms.decontract_basis()
         contr_coeff = scipy.linalg.block_diag(*ctr_coeff)
-        contr_coeff2 = compute_kinematic_factors(pmol,contr_coeff, ham=ham)[1]
-        pmol.set_rinv_orig(mol.atom_coord(i))
-        atom_1e = pmol.intor('int1e_prinvxp', comp=3)
-        hso1etemp = -1. * atom_1e * (mol.atom_charge(i))
+        factors = compute_kinematic_factors(
+            pmol, contr_coeff, ham=ham, return_intermediates=(ham == 'DKH2'))
+        contr_coeff2 = factors[1]
+        # Only this atom's nuclear potential belongs in the one-center
+        # correction. pmol still contains all molecular nuclei.
+        with pmol.with_rinv_origin(mol.atom_coord(i)):
+            if ham == 'DKH2':
+                pvp = -mol.atom_charge(i) * pmol.intor('int1e_sprinvsp')
+                v = -mol.atom_charge(i) * pmol.intor('int1e_rinv')
+                hso1etemp = pvp[:3]
+            else:
+                atom_1e = pmol.intor('int1e_prinvxp', comp=3)
+                hso1etemp = -mol.atom_charge(i) * atom_1e
         hso1e[:,p0:p1,p0:p1] += np.einsum('ij,yjl,lm->yim',
                                           contr_coeff2.T, hso1etemp, contr_coeff2)
+        if ham == 'DKH2':
+            hso1e[:,p0:p1,p0:p1] += hso1e_secord(v, pvp, factors[2])
     return hso1e
 
 def compute_hso2(mol, dm0, ham='DKH'):
@@ -283,9 +371,8 @@ def compute_hso2(mol, dm0, ham='DKH'):
         dm0: np.array (nao, nao)
             density matrix
         ham: str
-            Hamiltonian type, 'bp' or 'dkh'
-            bp: Breit-Pauli
-            dkh: Douglas-Kroll-Hess up to first order
+            'BP': Breit-Pauli; 'DKH' or 'DKH2': the existing first-order
+            DKH two-electron operator. No second-order 2e term is included.
     returns:
         vj: np.array (3, nao, nao)
             J-like matrix in cGTO basis
@@ -322,9 +409,9 @@ def compute_soc_integrals(mol, dm, ham='DKH'):
         dm: np.array (nao, nao)
             density matrix of parent wavefunction.
         ham: str
-            Hamiltonian type, 'bp' or 'dkh'
-            bp: Breit-Pauli
-            dkh: Douglas-Kroll-Hess up to first order
+            'BP': Breit-Pauli; 'DKH': first-order Douglas-Kroll-Hess;
+            'DKH2': second-order 1e SOC plus the existing first-order
+            DKH two-electron mean-field contribution.
     return:
         hso: tuple ((3, nao, nao), (3, nao, nao))
             1e and 2e SOC integrals in cGTO basis
