@@ -103,6 +103,26 @@ class KnownValues(unittest.TestCase):
                 self.assertEqual(energies.shape, (6,))
                 assert_allclose(energies, reference, atol=1e-8, rtol=0)
 
+    def test_dkh2_siso(self):
+        for amf in (True, False):
+            with self.subTest(amf=amf):
+                my_siso = siso.SISO(
+                    self.mc, ham='dkh2', amf=amf, mmf=not amf)
+                energies, si_vecs = my_siso.kernel()
+                self.assertEqual(my_siso.ham, 'DKH2')
+                self.assertEqual(energies.shape, (6,))
+                self.assertTrue(np.isfinite(energies).all())
+                hamiltonian = my_siso.compute_hamiltonian()
+                assert_allclose(
+                    hamiltonian, hamiltonian.conj().T, atol=1e-12, rtol=0)
+                assert_allclose(
+                    hamiltonian @ si_vecs, si_vecs * energies,
+                    atol=1e-10, rtol=0)
+                dkh = siso.SISO(
+                    self.mc, ham='DKH', amf=amf, mmf=not amf).run()
+                self.assertGreater(
+                    np.linalg.norm(my_siso.imds.z - dkh.imds.z), 1e-10)
+
 
 if __name__ == '__main__':
     unittest.main()

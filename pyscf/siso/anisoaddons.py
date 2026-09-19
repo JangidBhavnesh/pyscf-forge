@@ -267,7 +267,8 @@ def generate_aniso_data(mol, mc, modelspace=None, mysiso=None, origin='CHARGE_CE
         origin: str
             Origin for the integrals, default is 'CHARGE_CENTER'
         ham: str or None
-            SOC Hamiltonian, 'BP' or 'DKH'. If None, use ``mysiso.ham``.
+            SOC Hamiltonian, 'BP', 'DKH', or 'DKH2'. If None, use ``mysiso.ham``.
+            DKH2 includes second-order 1e and first-order DKH 2e terms.
             An explicitly supplied value must match ``mysiso.ham``.
     returns:
         data: dict
@@ -300,8 +301,8 @@ def generate_aniso_data(mol, mc, modelspace=None, mysiso=None, origin='CHARGE_CE
 
     if ham is None:
         ham = mysiso.ham
-    elif not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH'):
-        raise ValueError("ham must be 'BP' or 'DKH'")
+    elif not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH', 'DKH2'):
+        raise ValueError("ham must be 'BP', 'DKH', or 'DKH2'")
     else:
         ham = ham.upper()
     if ham != mysiso.ham:

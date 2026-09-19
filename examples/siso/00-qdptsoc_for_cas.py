@@ -71,8 +71,8 @@ CASCI energy for each state
 
 # 4. State interaction
 # SISO reads the model space from the state-average FCI solvers attached to mc.
-# There are two Hamiltonian options for the SOC calculations: Breit-Pauli (BP) and
-# Douglas-Kroll-Hess (DKH).
+# SOC Hamiltonian options: 'BP' (Breit-Pauli), 'DKH' (first-order Douglas-Kroll-Hess),
+# and 'DKH2' (second-order 1e DKH with the first-order DKH 2e term).
 
 # amf: is the AMFI integrals.
 

@@ -249,7 +249,8 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
         soc2e: bool
             include 2e SOC integrals.
         ham: str
-            SOC Hamiltonian (BP or DKH)
+            SOC Hamiltonian ('BP', 'DKH', or 'DKH2'). DKH2 adds the
+            second-order 1e term and retains the first-order DKH 2e term.
         dm: np.array (nao, nao), optional
             density matrix of parent wavefunction.
     returns:
@@ -262,8 +263,8 @@ def socintegrals(mol, somf=True, amf=True, mmf=False, soc1e=True, soc2e=True, ha
              'soc1e': soc1e, 'soc2e': soc2e}
     if any(not isinstance(value, (bool, np.bool_)) for value in flags.values()):
         raise TypeError("somf, amf, mmf, soc1e, and soc2e must be boolean")
-    if not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH'):
-        raise ValueError("ham must be 'BP' or 'DKH'")
+    if not isinstance(ham, str) or ham.upper() not in ('BP', 'DKH', 'DKH2'):
+        raise ValueError("ham must be 'BP', 'DKH', or 'DKH2'")
     ham = ham.upper()
     if not somf:
         raise NotImplementedError("Explicit 2e SOC integrals are not implemented yet")

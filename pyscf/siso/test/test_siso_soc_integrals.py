@@ -175,6 +175,27 @@ class KnownValues(unittest.TestCase):
         hso2e = amfi.compute_hso2(mol, dm, ham='DKH')
         np.testing.assert_allclose(hso2e, hso2e_ref, atol=1e-12, rtol=0.0)
 
+    def test_dkh2_components(self):
+        for amf in (True, False):
+            with self.subTest(amf=amf):
+                options = dict(amf=amf, mmf=not amf, dm=self.dm)
+                with lib.temporary_env(lib.param, LIGHT_SPEED=LIGHT_SPEED):
+                    hso = socaddons.socintegrals(
+                        self.mol, ham='dkh2', **options)
+                    hso1e = socaddons.socintegrals(
+                        self.mol, ham='DKH2', soc2e=False, **options)
+                    hso2e = socaddons.socintegrals(
+                        self.mol, ham='DKH2', soc1e=False, **options)
+                    dkh1e = socaddons.socintegrals(
+                        self.mol, ham='DKH', soc2e=False, **options)
+                    dkh2e = socaddons.socintegrals(
+                        self.mol, ham='DKH', soc1e=False, **options)
+                np.testing.assert_allclose(hso, hso1e + hso2e, atol=1e-12)
+                np.testing.assert_allclose(hso2e, dkh2e, atol=1e-12)
+                self.assertGreater(np.linalg.norm(hso1e - dkh1e), 1e-10)
+                np.testing.assert_allclose(
+                    hso1e, hso1e.conj().transpose(0, 2, 1), atol=1e-12)
+
 
 if __name__ == '__main__':
     unittest.main()
