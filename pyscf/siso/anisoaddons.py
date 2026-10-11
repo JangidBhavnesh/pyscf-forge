@@ -165,7 +165,9 @@ def get_1e_prop(mc, modelspace=None, mysiso=None, origin='CHARGE_CENTER'):
         orbangmoment: list
             List of orbital angular momentum matrices for each multiplicity group
         amfiinterac: list
-            List of spin-orbit interaction matrices for each multiplicity group
+            List of spin-orbit interaction matrices for each multiplicity group.
+            These are zero when both SOC terms are disabled, including for
+            SSC-only state-interaction calculations.
         edipinterac: list
             List of electric dipole interaction matrices for each multiplicity group
     """
@@ -181,14 +183,20 @@ def get_1e_prop(mc, modelspace=None, mysiso=None, origin='CHARGE_CENTER'):
     soc1e = mysiso.soc1e
     soc2e = mysiso.soc2e
     dm = None
-    if mmf:
+    if mmf and (soc1e or soc2e):
         dm = mc.make_rdm1()
     mo_cas = mc.mo_coeff[:, mc.ncore:mc.ncas+mc.ncore]
     ints_mo = _basis_transformation(
         _get_lxyz_integrals(mc._scf.mol, origin), mo_cas)
-    ints_so = _basis_transformation(_get_soc_integrals(mc._scf.mol, origin, ham=ham,
-                                                       somf=somf, amf=amf, mmf=mmf, soc1e=soc1e,
-                                                       soc2e=soc2e, dm=dm), mo_cas)
+    if soc1e or soc2e:
+        ints_so = _basis_transformation(
+            _get_soc_integrals(mc._scf.mol, origin, ham=ham, somf=somf,
+                               amf=amf, mmf=mmf, soc1e=soc1e,
+                               soc2e=soc2e, dm=dm), mo_cas)
+    else:
+        # SSC-only eigenstates still need magnetic and electric operators,
+        # while the spin-free AMFI data must contain no SOC contribution.
+        ints_so = np.zeros((3, ncas, ncas))
     ints_dip = _basis_transformation(
         _get_dipole_integrals(mc._scf.mol, origin), mo_cas)
 
@@ -309,8 +317,8 @@ def generate_aniso_data(mol, mc, modelspace=None, mysiso=None, origin='CHARGE_CE
             f"ham={ham!r} does not match the SISO Hamiltonian "
             f"{mysiso.ham!r}")
 
-    # From the state vectors and energies construct the Hamiltonian
-    # Spin-orbit Hamiltonian matrix
+    # Reconstruct the complete state-interaction Hamiltonian from its
+    # eigenvectors and energies, including SSC when enabled in mysiso.
     hso = si_vecs @ np.diag(si_energies) @ si_vecs.conj().T
     data = {}
 
